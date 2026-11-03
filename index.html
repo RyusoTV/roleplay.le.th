@@ -1,0 +1,9 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LuminaEther Hub</title><link rel="stylesheet" href="style.css"></head><body>
+<div id="load"><div class="logo">LE</div><div class="bar"><i id="fill"></i></div><small id="pct">0%</small></div>
+<div id="gate" hidden><form id="auth"><h1>LuminaEther Hub</h1><div id="tabs"><button type="button" data-m="in" class="on">เข้าสู่ระบบ</button><button type="button" data-m="up">สมัครสมาชิก</button></div>
+<div class="up"><input id="xbox" placeholder="ชื่อ (Xbox)" maxlength="16"><input id="age" type="number" min="1" max="120" placeholder="อายุ (OC)"><input id="nick" placeholder="นามแฝง" maxlength="32"></div>
+<input id="email" type="email" placeholder="อีเมล" required><input id="pw" type="password" placeholder="รหัสผ่าน (6 ตัวขึ้นไป)" minlength="6" required><button class="go">ตกลง</button><p id="err"></p></form></div>
+<div id="app" hidden><nav id="rail"></nav><aside id="side"></aside><main id="main"></main><aside id="mem"></aside></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script></body></html>
