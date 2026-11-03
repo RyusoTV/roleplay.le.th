@@ -1,9 +1,149 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LuminaEther Hub</title><link rel="stylesheet" href="style.css"></head><body>
-<div id="load"><div class="logo">LE</div><div class="bar"><i id="fill"></i></div><small id="pct">0%</small></div>
-<div id="gate" hidden><form id="auth"><h1>LuminaEther Hub</h1><div id="tabs"><button type="button" data-m="in" class="on">เข้าสู่ระบบ</button><button type="button" data-m="up">สมัครสมาชิก</button></div>
-<div class="up"><input id="xbox" placeholder="ชื่อ (Xbox)" maxlength="16"><input id="age" type="number" min="1" max="120" placeholder="อายุ (OC)"><input id="nick" placeholder="นามแฝง" maxlength="32"></div>
-<input id="email" type="email" placeholder="อีเมล" required><input id="pw" type="password" placeholder="รหัสผ่าน (6 ตัวขึ้นไป)" minlength="6" required><button class="go">ตกลง</button><p id="err"></p></form></div>
-<div id="app" hidden><nav id="rail"></nav><aside id="side"></aside><main id="main"></main><aside id="mem"></aside></div>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>RolePlay Civitas</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛</text></svg>">
+<style>
+:root{--bg:#17181b;--p:#202226;--s:#2a2c31;--t:#e4e6ea;--m:#9096a0;--a:#5865f2;--g:#23a55a;--r:#f23f43}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;display:flex;flex-direction:column;background:var(--s);color:var(--t);font:15px/1.5 system-ui,"Noto Sans Thai",sans-serif;padding-top:env(safe-area-inset-top)}
+#bn{background:var(--a);text-align:center;padding:4px}
+#app{flex:1;min-height:0;display:grid;grid-template-columns:72px 240px 1fr 220px}#app[hidden]{display:none}
+#rail{background:var(--bg);display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0;overflow-y:auto}
+.ic{width:48px;height:48px;border-radius:50%;background:var(--s);display:grid;place-items:center;cursor:pointer;flex:none;transition:border-radius .15s,background .15s}.ic:hover,.ic.on{border-radius:16px;background:var(--a)}
+#side,#mem{background:var(--p);overflow-y:auto;padding:10px}#side h3,#mem h4{margin:4px 6px 10px}
+.ch{padding:6px 10px;border-radius:6px;cursor:pointer;color:var(--m)}.ch:hover,.ch.on{background:var(--s);color:var(--t)}
+.mb{padding:4px 6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;cursor:pointer}.mb select{max-width:90px;background:var(--s);color:var(--t);border:0}
+#main{display:flex;flex-direction:column;min-width:0;min-height:0;overflow-y:auto}
+header{padding:12px 16px;font-weight:700;border-bottom:1px solid var(--bg);position:sticky;top:0;background:var(--s);z-index:2}
+.pad{padding:16px}#msgs{flex:1;overflow-y:auto;padding:8px 16px}
+.msg{display:flex;gap:10px;padding:6px 0;position:relative}.msg:hover{background:#ffffff08}
+.av{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none}.av.big{width:88px;height:88px;margin-top:-44px;border:5px solid var(--s)}
+.act{position:absolute;right:0;top:-6px;display:none;background:var(--p);border-radius:6px;padding:2px 6px}.msg:hover .act{display:flex;gap:6px}.act i{cursor:pointer;font-style:normal}
+.rx{display:inline-block;background:var(--p);border:1px solid var(--p);border-radius:10px;padding:0 8px;margin:2px 4px 0 0;cursor:pointer}.rx.on{border-color:var(--a)}
+.rp{color:var(--m);font-size:13px;border-left:3px solid var(--m);padding-left:6px}small{color:var(--m)}
+.bd{font-size:11px;padding:1px 6px;border-radius:8px;background:var(--p)}.r-ceo{background:#f0b232;color:#000}.r-vice_ceo{background:#e8743b;color:#000}.r-admin{background:var(--r)}.r-staff{background:var(--g)}.vf{color:#4ea1ff}
+.bar{display:flex;gap:8px;padding:12px 16px;flex-wrap:wrap}#rb{padding:4px 16px;color:var(--m)}
+input,textarea,button{font:inherit;color:var(--t);background:var(--bg);border:0;border-radius:8px;padding:10px 12px;max-width:100%}.bar input{flex:1;min-width:0}textarea{width:100%;display:block;margin:6px 0}
+button{background:var(--a);cursor:pointer}button:hover{filter:brightness(1.15)}a{color:#5ab0ff;cursor:pointer}
+.card2{background:var(--p);border-radius:10px;padding:12px;margin:8px 0}.bn{height:150px;background:var(--a) center/cover}
+#auth{flex:1;display:grid;place-items:center;padding:16px}#auth[hidden]{display:none}#auth .card{background:var(--p);padding:28px;border-radius:14px;width:min(400px,100%);display:flex;flex-direction:column;gap:10px}
+#auth h1{margin:0 0 6px;font-size:26px}.err{color:var(--r);margin:0}
+#vg{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;padding:12px;align-content:start}#vg video{width:100%;background:#000;border-radius:10px}
+#tt{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--r);padding:10px 16px;border-radius:8px;z-index:9;max-width:90vw}#tt:empty{display:none}
+#mn{display:none}
+@media(max-width:800px){#app{grid-template-columns:60px 1fr}#side{position:fixed;left:60px;top:0;bottom:0;width:230px;z-index:5;transform:translateX(-400%);transition:transform .2s}#side.open{transform:none}#mem{display:none}#mn{display:block;position:fixed;left:66px;top:calc(env(safe-area-inset-top) + 6px);z-index:6;padding:4px 10px}header{padding-left:56px}}
+</style></head><body>
+<div id=bn hidden></div><div id=auth hidden></div>
+<div id=app hidden><nav id=rail></nav><aside id=side></aside><main id=main></main><aside id=mem></aside></div>
+<button id=mn onclick="$('#side').classList.toggle('open')">☰</button><div id=tt></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script></body></html>
+<script>
+/* ===== ใส่ค่าจาก Supabase > Project Settings > API ===== */
+const SB_URL='https://YOUR-PROJECT.supabase.co',SB_KEY='YOUR-ANON-PUBLIC-KEY';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s),RK=['member','staff','admin','vice_ceo','ceo'],RN={member:'สมาชิก',staff:'ทีมงาน',admin:'คณะบริหาร',vice_ceo:'รองCEO',ceo:'CEO'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const AV='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" fill="#5865f2"/></svg>');
+let me,sv,ch,MY=[],CH=[],RL=[],MB=[],MS=[],SITE={},subs,pendingEmail,replyTo=null;
+const dn=p=>p?`${esc(p.nickname)} (${esc(p.xbox)})`:'?';
+const badge=p=>`<span class="bd r-${p.role}">${RN[p.role]}</span>${p.verified?'<span class=vf title="ยืนยันตัวตนแล้ว">✔</span>':''}`;
+const toast=m=>{$('#tt').textContent=m;setTimeout(()=>$('#tt').textContent='',4000)};
+
+/* ---------- ตั้งค่าเว็บ (เก็บใน Supabase ทุกคนเห็นเหมือนกัน) ---------- */
+async function applySite(){const{data}=await sb.from('site_settings').select('*');SITE={};(data||[]).forEach(r=>SITE[r.key]=r.value);
+ document.title=SITE.name||'RolePlay Civitas';if(SITE.accent)document.documentElement.style.setProperty('--a',SITE.accent);$('#bn').textContent=SITE.banner||'';$('#bn').hidden=!SITE.banner}
+
+/* ---------- สมัคร / OTP / เข้าสู่ระบบ ---------- */
+function authView(v,msg){$('#app').hidden=true;const a=$('#auth');a.hidden=false;
+ const i=(id,ph,t='text')=>`<input id=${id} placeholder="${ph}" type=${t} autocomplete=off>`;
+ a.innerHTML=`<div class=card><h1>${esc(SITE.name||'RolePlay Civitas')}</h1>`+(msg?`<p class=err>${esc(msg)}</p>`:'')+({
+ login:i('e','อีเมล','email')+i('p','รหัสผ่าน','password')+`<button onclick=login()>เข้าสู่ระบบ</button><a onclick="authView('signup')">สมัครสมาชิก</a>`,
+ signup:i('x','ชื่อ (Xbox)')+i('o','อายุ (OC)','number')+i('n','นามแฝง')+i('e','อีเมล','email')+i('p','รหัสผ่าน (6 ตัวขึ้นไป)','password')+`<button onclick=signup()>สมัครและรับรหัส OTP</button><a onclick="authView('login')">มีบัญชีแล้ว</a>`,
+ otp:`<p>ส่งรหัส OTP ไปที่ ${esc(pendingEmail)} แล้ว</p>`+i('c','รหัส OTP')+`<button onclick=verify()>ยืนยันรหัส</button><a onclick=resend()>ส่งรหัสอีกครั้ง</a>`}[v])+`</div>`}
+async function signup(){const f=k=>$('#'+k).value.trim(),email=f('e'),pw=$('#p').value,d={xbox:f('x'),oc:+f('o'),nickname:f('n')};
+ if(!d.xbox||!d.oc||!d.nickname||!email||pw.length<6)return toast('กรอกข้อมูลให้ครบ (รหัสผ่านอย่างน้อย 6 ตัว)');
+ const{error}=await sb.auth.signUp({email,password:pw,options:{data:d}});if(error)return toast(error.message);pendingEmail=email;authView('otp')}
+async function verify(){const{error}=await sb.auth.verifyOtp({email:pendingEmail,token:$('#c').value.trim(),type:'signup'});if(error)return toast('รหัสไม่ถูกต้องหรือหมดอายุ');boot()}
+async function resend(){const{error}=await sb.auth.resend({type:'signup',email:pendingEmail});toast(error?error.message:'ส่งรหัสใหม่แล้ว')}
+async function login(){const email=$('#e').value.trim(),{error}=await sb.auth.signInWithPassword({email,password:$('#p').value});
+ if(error){if(/confirm/i.test(error.message)){pendingEmail=email;await resend();return authView('otp')}return toast('อีเมลหรือรหัสผ่านไม่ถูกต้อง')}boot()}
+const out=async()=>{leaveVoice();await sb.auth.signOut();me=sv=ch=null;authView('login')};
+async function boot(){const{data:{session}}=await sb.auth.getSession();if(!session)return authView('login');
+ const{data:p}=await sb.from('profiles').select('*').eq('id',session.user.id).single();
+ if(!p||p.banned){await sb.auth.signOut();return authView('login',p?'บัญชีนี้ถูกแบน':'ไม่พบโปรไฟล์')}
+ me=p;$('#auth').hidden=true;$('#app').hidden=false;await loadServers();show('home')}
+
+/* ---------- ชุมชน / ช่อง / ยศ ---------- */
+async function loadServers(){const{data}=await sb.from('server_members').select('servers(*)').eq('user_id',me.id);MY=(data||[]).map(r=>r.servers).filter(Boolean);
+ $('#rail').innerHTML=`<b class=ic title=หน้าแรก onclick="show('home')">🏠</b>`+MY.map(s=>`<b class="ic ${sv?.id==s.id?'on':''}" title="${esc(s.name)}" onclick="openServer('${s.id}')">${esc(s.name[0])}</b>`).join('')+
+ `<b class=ic title=สร้างชุมชน onclick=newServer()>＋</b><b class=ic title=ค้นหาชุมชน onclick="show('disc')">🧭</b><b class=ic title=โปรไฟล์ onclick="show('me')">👤</b>`+(RK.indexOf(me.role)>=1?`<b class=ic title=หลังบ้าน onclick="show('admin')">🛠</b>`:'')+`<b class=ic title=ออกจากระบบ onclick=out()>⏻</b>`}
+async function newServer(){const n=prompt('ชื่อชุมชน');if(!n)return;const{data:s,error}=await sb.from('servers').insert({name:n,owner:me.id}).select().single();if(error)return toast(error.message);
+ await sb.from('server_members').insert({server_id:s.id,user_id:me.id});await sb.from('channels').insert([{server_id:s.id,name:'ทั่วไป',kind:'text'},{server_id:s.id,name:'ห้องเสียง',kind:'voice'}]);await loadServers();openServer(s.id)}
+async function openServer(id){sv=MY.find(s=>s.id==id);leaveVoice();
+ const[c,r,m]=await Promise.all([sb.from('channels').select('*').eq('server_id',id).order('created_at'),sb.from('roles').select('*').eq('server_id',id),sb.from('server_members').select('role_id,profiles(*)').eq('server_id',id)]);
+ CH=c.data||[];RL=r.data||[];MB=m.data||[];const own=sv.owner==me.id;
+ $('#side').innerHTML=`<h3>${esc(sv.name)}</h3>`+CH.map(x=>`<div class="ch ${ch?.id==x.id?'on':''}" onclick="openCh('${x.id}')">${x.kind=='voice'?'🔊':'#'} ${esc(x.name)}</div>`).join('')+(own?`<div class=ch onclick=newCh()>＋ เพิ่มช่อง</div><div class=ch onclick=newRole()>＋ เพิ่มยศ</div>`:'');
+ $('#mem').innerHTML=`<h4>สมาชิก ${MB.length}</h4>`+MB.map(x=>{const ro=RL.find(q=>q.id==x.role_id),u=x.profiles;return`<div class=mb onclick="show('u','${u.id}')"><span style="color:${esc(ro?.color||'inherit')}">${dn(u)}</span>${ro?`<small>${esc(ro.name)}</small>`:''}${own&&u.id!=me.id?`<select onclick=event.stopPropagation() onchange="setRole('${u.id}',this.value)"><option value="">ไม่มียศ</option>${RL.map(q=>`<option value=${q.id} ${q.id==x.role_id?'selected':''}>${esc(q.name)}</option>`).join('')}</select>`:''}</div>`}).join('');
+ await loadServers();const t=CH.find(x=>x.kind=='text');ch=null;t?openCh(t.id):show('chat')}
+async function newCh(){const n=prompt('ชื่อช่อง');if(!n)return;await sb.from('channels').insert({server_id:sv.id,name:n,kind:confirm('OK = ช่องเสียง / Cancel = ช่องข้อความ')?'voice':'text'});openServer(sv.id)}
+async function newRole(){const n=prompt('ชื่อยศ');if(!n)return;await sb.from('roles').insert({server_id:sv.id,name:n,color:prompt('สี เช่น #ff8800','#ff8800')});openServer(sv.id)}
+async function setRole(u,r){await sb.from('server_members').update({role_id:r||null}).eq('server_id',sv.id).eq('user_id',u);openServer(sv.id)}
+async function join(id){const{error}=await sb.from('server_members').insert({server_id:id,user_id:me.id});if(error&&error.code!='23505')return toast(error.message);await loadServers();openServer(id)}
+
+/* ---------- แชต / ตอบกลับ / อีโมจิ ---------- */
+async function openCh(id){ch=CH.find(x=>x.id==id);$('#side').classList.remove('open');if(subs){sb.removeChannel(subs);subs=null}
+ document.querySelectorAll('.ch').forEach(e=>e.classList.toggle('on',e.getAttribute('onclick')==`openCh('${id}')`));
+ if(ch.kind=='voice')return voiceView();show('chat');await loadMsgs();
+ subs=sb.channel('m'+id).on('postgres_changes',{event:'*',schema:'public',table:'messages',filter:'channel_id=eq.'+id},loadMsgs).subscribe()}
+async function loadMsgs(){const{data}=await sb.from('messages').select('*,profiles(nickname,xbox,avatar,role,verified)').eq('channel_id',ch.id).order('created_at').limit(100);MS=data||[];const box=$('#msgs');if(!box)return;
+ box.innerHTML=MS.map(m=>{const p=m.profiles,rp=MS.find(x=>x.id==m.reply_to),rx=Object.entries(m.reactions||{}).filter(([,u])=>u.length).map(([e,u])=>`<span class="rx ${u.includes(me.id)?'on':''}" onclick="react('${m.id}','${e}')">${e} ${u.length}</span>`).join('');
+ return`<div class=msg><img class=av src="${esc(p.avatar)||AV}"><div><b>${dn(p)}</b> ${badge(p)} <small>${new Date(m.created_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</small>${rp?`<div class=rp>↩ ${dn(rp.profiles)}: ${esc(rp.content.slice(0,60))}</div>`:''}<div>${esc(m.content)}</div><div>${rx}</div></div><span class=act>${['👍','❤️','😂','🔥','😮'].map(e=>`<i onclick="react('${m.id}','${e}')">${e}</i>`).join('')}<i onclick="rep('${m.id}')">↩</i>${m.user_id==me.id||me.role!='member'?`<i onclick="del('${m.id}')">🗑</i>`:''}</span></div>`}).join('');box.scrollTop=box.scrollHeight}
+function rep(id){replyTo=id;$('#rb').textContent='ตอบกลับ: '+MS.find(m=>m.id==id).content.slice(0,40);$('#rb').hidden=false;$('#in').focus()}
+async function send(){const i=$('#in'),v=i.value.trim();if(!v)return;i.value='';const{error}=await sb.from('messages').insert({channel_id:ch.id,user_id:me.id,content:v,reply_to:replyTo});replyTo=null;$('#rb').hidden=true;if(error)toast(error.message);loadMsgs()}
+const react=async(m,e)=>{await sb.rpc('react',{m,e});loadMsgs()},del=async id=>{await sb.from('messages').delete().eq('id',id);loadMsgs()};
+
+/* ---------- ช่องเสียง + แชร์หน้าจอ (WebRTC, สัญญาณผ่าน Supabase Realtime) ---------- */
+let vc,peers={},loc,scr;
+function voiceView(){$('#main').innerHTML=`<header>🔊 ${esc(ch.name)}</header><div id=vg></div><div class=bar><button onclick=joinVoice()>เข้าร่วมห้องเสียง</button><button onclick=share()>แชร์หน้าจอ</button><button onclick=leaveVoice() style="background:var(--r)">ออก</button></div>`}
+const vsend=(to,d)=>vc.send({type:'broadcast',event:'s',payload:{from:me.id,to,...d}});
+function peer(id){if(peers[id])return peers[id].pc;const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]}),p=peers[id]={pc,polite:me.id<id,making:false};
+ loc.getTracks().forEach(t=>pc.addTrack(t,loc));if(scr&&scr.active)scr.getTracks().forEach(t=>pc.addTrack(t,scr));
+ pc.onicecandidate=e=>e.candidate&&vsend(id,{c:e.candidate.toJSON()});
+ pc.onnegotiationneeded=async()=>{try{p.making=true;await pc.setLocalDescription();vsend(id,{d:pc.localDescription.toJSON()})}finally{p.making=false}};
+ pc.ontrack=e=>{const st=e.streams[0];let v=document.getElementById('v'+st.id);if(!v){v=document.createElement('video');v.id='v'+st.id;v.dataset.p=id;v.autoplay=v.playsInline=true;$('#vg')?.append(v)}v.srcObject=st;if(e.track.kind=='video')e.track.onmute=()=>v.remove()};return pc}
+async function onSig({from,d,c}){const pc=peer(from),p=peers[from];
+ if(d){if(d.type=='offer'&&(p.making||pc.signalingState!='stable')&&!p.polite)return;await pc.setRemoteDescription(d);if(d.type=='offer'){await pc.setLocalDescription();vsend(from,{d:pc.localDescription.toJSON()})}}
+ else if(c)try{await pc.addIceCandidate(c)}catch{}}
+function drop(id){peers[id]?.pc.close();delete peers[id];document.querySelectorAll(`[data-p="${id}"]`).forEach(e=>e.remove())}
+async function joinVoice(){if(vc)return;try{loc=await navigator.mediaDevices.getUserMedia({audio:true})}catch{return toast('ไม่ได้รับอนุญาตให้ใช้ไมค์')}
+ vc=sb.channel('v'+ch.id,{config:{presence:{key:me.id}}});
+ vc.on('broadcast',{event:'s'},({payload:x})=>x.to==me.id&&onSig(x)).on('presence',{event:'join'},({key})=>key!=me.id&&peer(key)).on('presence',{event:'leave'},({key})=>drop(key))
+ .subscribe(async s=>{if(s=='SUBSCRIBED')await vc.track({n:me.nickname})});toast('เข้าห้องเสียงแล้ว')}
+async function share(){if(!vc)return toast('เข้าร่วมห้องเสียงก่อน');try{scr=await navigator.mediaDevices.getDisplayMedia({video:true})}catch{return}
+ const t=scr.getVideoTracks()[0],se=Object.values(peers).map(p=>[p.pc,p.pc.addTrack(t,scr)]);t.onended=()=>se.forEach(([pc,s])=>pc.signalingState!='closed'&&pc.removeTrack(s))}
+function leaveVoice(){if(vc){sb.removeChannel(vc);vc=null}Object.keys(peers).forEach(drop);loc?.getTracks().forEach(t=>t.stop());scr?.getTracks().forEach(t=>t.stop());loc=scr=null}
+
+/* ---------- หน้าต่าง ๆ ---------- */
+function show(v,a){const M=$('#main');
+ if(v=='chat')M.innerHTML=sv&&ch?`<header># ${esc(ch.name)}</header><div id=msgs></div><div id=rb hidden></div><div class=bar><input id=in placeholder="ส่งข้อความ" onkeydown="event.key=='Enter'&&send()"><button onclick=send()>ส่ง</button></div>`:`<div class=pad>เลือกหรือสร้างชุมชนก่อน</div>`;
+ if(v=='home')home();if(v=='disc')disc();if(v=='me')profile();if(v=='u')profile(a);if(v=='admin')admin()}
+async function home(){const[a,p,t]=await Promise.all([sb.from('announcements').select('*,profiles(nickname,xbox)').order('created_at',{ascending:false}).limit(20),sb.from('partners').select('*'),sb.from('profiles').select('*').neq('role','member')]);
+ $('#main').innerHTML=`<header>📢 ข่าวสาร</header><div class=pad>`+((a.data||[]).map(x=>`<div class=card2><b>${esc(x.title)}</b><p>${esc(x.body)}</p><small>${dn(x.profiles)}</small></div>`).join('')||'<p>ยังไม่มีข่าวสาร</p>')+`<h3>พันธมิตร</h3>`+((p.data||[]).map(x=>`<a href="${esc(x.url)}" target=_blank rel=noopener>${esc(x.name)}</a> `).join('')||'<small>ยังไม่มี</small>')+`<h3>ทีมงาน</h3>`+(t.data||[]).map(x=>`<div>${dn(x)} ${badge(x)}</div>`).join('')+`</div>`}
+async function disc(){const{data}=await sb.from('servers').select('*');$('#main').innerHTML=`<header>🧭 ค้นหาชุมชน</header><div class=pad>`+(data||[]).map(s=>`<div class=card2>${esc(s.name)} ${MY.some(m=>m.id==s.id)?'<small>เข้าร่วมแล้ว</small>':`<button onclick="join('${s.id}')">เข้าร่วม</button>`}</div>`).join('')+`</div>`}
+async function profile(id){const mine=!id||id==me.id,{data:p}=await sb.from('profiles').select('*').eq('id',mine?me.id:id).single(),{data:ps}=await sb.from('posts').select('*').eq('user_id',p.id).order('created_at',{ascending:false});
+ $('#main').innerHTML=`<div class=bn></div><div class=pad><img class="av big" src="${esc(p.avatar)||AV}"><h2>${dn(p)} ${badge(p)}</h2><p>${esc(p.bio)}</p><small>อายุ (OC): ${esc(p.oc)}</small>`+(mine?`<details><summary>แก้ไขโปรไฟล์</summary><input id=pa placeholder="ลิงก์รูปโปรไฟล์" value="${esc(p.avatar)}"><input id=pb placeholder="ลิงก์พื้นหลัง" value="${esc(p.banner)}"><textarea id=pt placeholder="อธิบายโปรไฟล์">${esc(p.bio)}</textarea><input id=pc placeholder="ลิงก์ช่องสตรีม/ติดตาม (ผู้ติดตาม 200+ ขอเครื่องหมายยืนยัน)" value="${esc(p.channel_url)}"><button onclick=saveP()>บันทึก</button></details><div class=bar><input id=po placeholder="โพสต์อะไรสักหน่อย"><button onclick=post()>โพสต์</button></div>`:'')+(ps||[]).map(x=>`<div class=card2>${esc(x.content)}<br><small>${new Date(x.created_at).toLocaleString('th-TH')}</small></div>`).join('')+`</div>`;
+ if(p.banner)$('.bn').style.backgroundImage='url("'+encodeURI(p.banner).replace(/"/g,'%22')+'")'}
+async function saveP(){const o={avatar:$('#pa').value.trim(),banner:$('#pb').value.trim(),bio:$('#pt').value,channel_url:$('#pc').value.trim()},{error}=await sb.from('profiles').update(o).eq('id',me.id);if(error)return toast(error.message);Object.assign(me,o);profile();toast('บันทึกแล้ว')}
+async function post(){const v=$('#po').value.trim();if(!v)return;await sb.from('posts').insert({user_id:me.id,content:v});profile()}
+
+/* ---------- หลังบ้าน (ทีมงาน / คณะบริหาร / รองCEO / CEO) ---------- */
+async function admin(){const lv=RK.indexOf(me.role);let h=`<header>🛠 หลังบ้าน — ${RN[me.role]}</header><div class=pad><h3>แจ้งข่าวสาร</h3><input id=at placeholder=หัวข้อ><textarea id=ab placeholder=เนื้อหา></textarea><button onclick=addNews()>ประกาศ</button>`;
+ if(lv>=2){const{data}=await sb.from('profiles').select('*').order('created_at',{ascending:false}).limit(200);
+ h+=`<h3>พันธมิตร</h3><div class=bar><input id=pn placeholder=ชื่อ><input id=pu placeholder=ลิงก์><button onclick=addPartner()>เพิ่ม</button></div><h3>จัดการสมาชิก</h3>`+(data||[]).map(u=>`<div class=mb onclick=event.stopPropagation()>${dn(u)} ${badge(u)}${u.banned?' <small>(ถูกแบน)</small>':''}${u.channel_url?`<a href="${esc(u.channel_url)}" target=_blank rel=noopener>ช่อง</a>`:''}<select onchange="upd('${u.id}',{role:this.value})">${RK.filter(r=>lv==4||r=='member'||r=='staff').map(r=>`<option value=${r} ${r==u.role?'selected':''}>${RN[r]}</option>`).join('')}</select>`+(lv==4?`<button onclick="upd('${u.id}',{verified:${!u.verified}})">${u.verified?'ถอด ✔':'ให้ ✔'}</button><button onclick="upd('${u.id}',{banned:${!u.banned}})">${u.banned?'ปลดแบน':'แบน/บัญชีดำ'}</button><button onclick="rm('${u.id}')" style="background:var(--r)">ลบ</button>`:'')+`</div>`).join('')}
+ if(lv==4)h+=`<h3>ตั้งค่าเว็บไซต์ (ทุกคนเห็นเหมือนกัน)</h3><div class=bar><input id=sn placeholder=ชื่อเว็บ value="${esc(SITE.name)}"><input id=sa type=color value="${esc(SITE.accent||'#5865f2')}"><input id=sbn placeholder=ข้อความแบนเนอร์ value="${esc(SITE.banner)}"><button onclick=saveSite()>บันทึก</button></div>`;
+ $('#main').innerHTML=h+'</div>'}
+async function addNews(){const t=$('#at').value.trim(),b=$('#ab').value.trim();if(!t)return;const{error}=await sb.from('announcements').insert({user_id:me.id,title:t,body:b});toast(error?error.message:'ประกาศแล้ว');if(!error){$('#at').value=$('#ab').value=''}}
+async function addPartner(){const n=$('#pn').value.trim();if(!n)return;const{error}=await sb.from('partners').insert({name:n,url:$('#pu').value.trim()});toast(error?error.message:'เพิ่มแล้ว')}
+async function upd(id,o){const{error}=await sb.from('profiles').update(o).eq('id',id);if(error)toast(error.message);admin()}
+async function rm(id){if(confirm('ลบบัญชีนี้ถาวร?')){await sb.rpc('delete_user',{u:id});admin()}}
+async function saveSite(){const rows=[['name',$('#sn').value],['accent',$('#sa').value],['banner',$('#sbn').value]].map(([key,value])=>({key,value}));const{error}=await sb.from('site_settings').upsert(rows);if(error)return toast(error.message);await applySite();toast('บันทึกแล้ว ทุกคนจะเห็นการเปลี่ยนแปลง')}
+
+applySite().then(boot);
+</script></body></html>
