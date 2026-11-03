@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RolePlay Civitas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<section id="auth">
+  <div class="card">
+    <h1>RolePlay Civitas</h1>
+    <div class="tabs"><button data-t="login" class="on">เข้าสู่ระบบ</button><button data-t="signup">สมัครสมาชิก</button></div>
+    <form id="f-login" class="pane on">
+      <input name="email" type="email" placeholder="อีเมล" required autocomplete="email">
+      <input name="password" type="password" placeholder="รหัสผ่าน" required autocomplete="current-password">
+      <button class="primary">เข้าสู่ระบบ</button>
+    </form>
+    <form id="f-signup" class="pane">
+      <input name="name" placeholder="ชื่อ (จะแสดงเป็น ชื่อ (xbox))" required maxlength="30">
+      <input name="age" type="number" min="1" max="120" placeholder="อายุ (oc)" required>
+      <input name="nickname" placeholder="นามแฝง" required maxlength="30">
+      <input name="email" type="email" placeholder="อีเมล" required autocomplete="email">
+      <input name="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 8 ตัว)" minlength="8" required autocomplete="new-password">
+      <button class="primary">สมัครและรับรหัส OTP</button>
+    </form>
+    <form id="f-otp" class="pane">
+      <p>ส่งรหัส OTP ไปที่ <b id="otp-mail"></b> แล้ว กรอกรหัสเพื่อยืนยัน</p>
+      <input name="code" inputmode="numeric" placeholder="รหัส OTP" required autocomplete="one-time-code">
+      <button class="primary">ยืนยันรหัส</button>
+      <button type="button" id="resend" class="ghost">ส่งรหัสอีกครั้ง</button>
+    </form>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <nav id="rail"></nav>
+  <aside id="side">
+    <header id="side-h"></header>
+    <div id="chans"></div>
+    <footer id="me"></footer>
+  </aside>
+  <main id="main">
+    <header id="top"><button id="burger" aria-label="เมนู">☰</button><span id="title"></span></header>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div id="modal" hidden><div class="sheet" id="sheet"></div></div>
+<div id="toast" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
