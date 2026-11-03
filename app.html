@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LuminaEther · แอป</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app-page">
+  <aside class="sidebar">
+    <div class="brand">LuminaEther</div>
+
+    <nav class="stack">
+      <button class="nav-btn" data-view="feed" type="button">โพสต์</button>
+      <button class="nav-btn" data-view="profile" type="button">โปรไฟล์</button>
+      <button class="nav-btn hidden" data-view="admin" id="nav-admin" type="button">ระบบทีมงาน</button>
+    </nav>
+
+    <div class="row" style="justify-content:space-between">
+      <strong>ชุมชน</strong>
+      <span class="row">
+        <button id="join-community" class="btn ghost" type="button" title="เข้าร่วมด้วยรหัส">เข้าร่วม</button>
+        <button id="new-community" class="btn ghost" type="button" title="สร้างชุมชน">+ สร้าง</button>
+      </span>
+    </div>
+    <ul id="community-list" class="stack"></ul>
+
+    <div id="me" class="card" style="margin-top:auto"></div>
+    <button id="logout" class="btn ghost" type="button">ออกจากระบบ</button>
+  </aside>
+
+  <main id="view" class="view"></main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
