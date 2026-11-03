@@ -1,6 +1,6 @@
 // ใส่ค่าจาก Supabase > Project Settings > API (anon key เปิดเผยได้ ความปลอดภัยอยู่ที่ RLS ใน schema.sql)
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const SUPABASE_URL = 'https://tdygzzlhhoutzxctbscf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_KijdNxL3RZ-gT5x-pLh2wQ_A05xVdVC';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = s => document.querySelector(s);
