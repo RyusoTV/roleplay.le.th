@@ -1,56 +1,242 @@
 <!doctype html>
-<html lang="th">
-<head>
-<meta charset="utf-8">
+<html lang="th"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RolePlay Civitas</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-<section id="auth">
-  <div class="card">
-    <h1>RolePlay Civitas</h1>
-    <div class="tabs"><button data-t="login" class="on">เข้าสู่ระบบ</button><button data-t="signup">สมัครสมาชิก</button></div>
-    <form id="f-login" class="pane on">
-      <input name="email" type="email" placeholder="อีเมล" required autocomplete="email">
-      <input name="password" type="password" placeholder="รหัสผ่าน" required autocomplete="current-password">
-      <button class="primary">เข้าสู่ระบบ</button>
-    </form>
-    <form id="f-signup" class="pane">
-      <input name="name" placeholder="ชื่อ (จะแสดงเป็น ชื่อ (xbox))" required maxlength="30">
-      <input name="age" type="number" min="1" max="120" placeholder="อายุ (oc)" required>
-      <input name="nickname" placeholder="นามแฝง" required maxlength="30">
-      <input name="email" type="email" placeholder="อีเมล" required autocomplete="email">
-      <input name="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 8 ตัว)" minlength="8" required autocomplete="new-password">
-      <button class="primary">สมัครและรับรหัส OTP</button>
-    </form>
-    <form id="f-otp" class="pane">
-      <p>ส่งรหัส OTP ไปที่ <b id="otp-mail"></b> แล้ว กรอกรหัสเพื่อยืนยัน</p>
-      <input name="code" inputmode="numeric" placeholder="รหัส OTP" required autocomplete="one-time-code">
-      <button class="primary">ยืนยันรหัส</button>
-      <button type="button" id="resend" class="ghost">ส่งรหัสอีกครั้ง</button>
-    </form>
-  </div>
-</section>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#313338;--bg2:#2b2d31;--bg3:#1e1f22;--tx:#dbdee1;--mu:#949ba4;--ac:#5865f2}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--tx);height:100dvh;overflow:hidden}
+button,input,textarea{font:inherit;color:var(--tx);background:var(--bg3);border:0;border-radius:6px;padding:10px}
+button{background:var(--ac);color:#fff;cursor:pointer;transition:.15s}button:hover{filter:brightness(1.15);transform:translateY(-1px)}
+button.g{background:var(--bg2)}
+.auth{max-width:380px;margin:6vh auto;padding:24px;background:var(--bg2);border-radius:12px;display:grid;gap:10px;animation:up .4s}
+@keyframes up{from{opacity:0;transform:translateY(14px)}}
+@keyframes pop{from{opacity:0;transform:scale(.97)}}
+#app{display:grid;grid-template-columns:72px 220px 1fr;height:100dvh}
+#sv,#ch{background:var(--bg3);padding:8px;overflow:auto}#ch{background:var(--bg2)}
+.sv{width:48px;height:48px;border-radius:50%;margin:0 0 8px;padding:0;background:var(--bg);transition:.2s}.sv:hover,.sv.on{border-radius:14px;background:var(--ac)}
+.c{display:block;width:100%;text-align:left;background:none;color:var(--mu);margin:2px 0;padding:6px 8px}.c.on,.c:hover{background:var(--bg);color:var(--tx);transform:none}
+#main{display:flex;flex-direction:column;min-width:0}
+#top{padding:12px 16px;border-bottom:1px solid var(--bg3);display:flex;gap:8px;align-items:center;justify-content:space-between}
+#msgs{flex:1;overflow:auto;padding:12px 16px}
+.m{padding:4px 0;animation:pop .2s}.m b{cursor:pointer}.m small{color:var(--mu)}.rp{color:var(--mu);font-size:12px;border-left:2px solid var(--mu);padding-left:6px}
+.men{background:#5865f240;color:#c9cdfb;border-radius:3px;padding:0 2px}
+#bar{display:flex;gap:6px;padding:10px}#bar input[type=text]{flex:1}
+.role{font-size:11px;border-radius:4px;padding:1px 5px;color:#fff;background:#3ba55c;margin-left:4px}.role.ceo{background:#ed4245}.role.vceo,.role.admin{background:#f0b232;color:#000}
+.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:9}
+.card{background:var(--bg2);border-radius:12px;width:min(420px,94vw);max-height:90dvh;overflow:auto;animation:pop .2s}
+.card .bn{height:110px;background:linear-gradient(135deg,#5865f2,#eb459e) center/cover}.card .in{padding:16px;display:grid;gap:8px}
+.av{width:72px;height:72px;border-radius:50%;background:var(--bg3) center/cover;margin-top:-52px;border:5px solid var(--bg2)}
+.vf{color:#3ba55c}img.f{max-width:260px;border-radius:8px;display:block;margin-top:4px}
+.av2{display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--bg3) center/cover;vertical-align:middle;margin-right:6px}.mr{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:6px 0}#mt{display:none}
+@media(max-width:700px){#app{grid-template-columns:60px 1fr}#ch{position:fixed;left:60px;top:0;bottom:0;width:230px;z-index:5;transform:translateX(-110%);transition:.25s}#ch.open{transform:none;box-shadow:4px 0 20px #0008}#main{grid-column:2}#mt{display:inline-block}}
+</style></head><body><div id="root"></div>
+<script>
+/* ===== ตั้งค่า: ใส่ค่าจาก Supabase > Project Settings > API ===== */
+const SUPABASE_URL="https://YOUR-PROJECT.supabase.co", SUPABASE_KEY="YOUR-ANON-KEY";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=(s,e=document)=>e.querySelector(s), R=$("#root");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const RN={member:"สมาชิก",staff:"ทีมงาน",admin:"คณะบริหาร",vceo:"รองCEO",ceo:"CEO"};
+const nm=p=>`${esc(p?.display_name)} (xbox)`;
+const badge=p=>`${p?.verified?'<span class="vf" title="ยืนยันตัวตนแล้ว">✔</span>':''}<span class="role ${p?.role}">${RN[p?.role]||""}</span>`;
+let me,servers=[],sv,chans=[],ch,sub,cache={},replyTo=null;
 
-<div id="app" hidden>
-  <nav id="rail"></nav>
-  <aside id="side">
-    <header id="side-h"></header>
-    <div id="chans"></div>
-    <footer id="me"></footer>
-  </aside>
-  <main id="main">
-    <header id="top"><button id="burger" aria-label="เมนู">☰</button><span id="title"></span></header>
-    <div id="view"></div>
-  </main>
-</div>
+function authView(mode="in",email=""){
+ R.innerHTML=mode==="otp"?`<div class="auth"><h2>ยืนยันอีเมล</h2><p>ใส่รหัส OTP ที่ส่งไปที่ ${esc(email)}</p>
+ <input id="o" inputmode="numeric" placeholder="รหัส OTP"><button id="go">ยืนยัน</button><button class="g" id="bk">กลับ</button></div>`
+ :`<div class="auth"><h2>RolePlay Civitas</h2>
+ ${mode==="up"?`<input id="n" placeholder="ชื่อ (xbox)"><input id="a" type="number" min="1" placeholder="อายุ (oc)"><input id="l" placeholder="นามแฝง">`:""}
+ <input id="e" type="email" placeholder="อีเมล"><input id="p" type="password" placeholder="รหัสผ่าน">
+ <button id="go">${mode==="up"?"สมัครสมาชิก":"เข้าสู่ระบบ"}</button>
+ <button class="g" id="sw">${mode==="up"?"มีบัญชีแล้ว? เข้าสู่ระบบ":"ยังไม่มีบัญชี? สมัคร"}</button></div>`;
+ const g=id=>$("#"+id)?.value.trim();
+ $("#sw") && ($("#sw").onclick=()=>authView(mode==="up"?"in":"up"));
+ $("#bk") && ($("#bk").onclick=()=>authView("in"));
+ $("#go").onclick=async()=>{
+  if(mode==="otp"){const{error}=await db.auth.verifyOtp({email,token:g("o"),type:"signup"});return error?alert(error.message):boot();}
+  const e=g("e"),p=$("#p").value;
+  if(mode==="up"){
+   if(!g("n")||!g("a")||!g("l")||!e||p.length<6)return alert("กรอกข้อมูลให้ครบ (รหัสผ่านอย่างน้อย 6 ตัว)");
+   const{error}=await db.auth.signUp({email:e,password:p,options:{data:{display_name:g("n"),age:+g("a"),alias:g("l")}}});
+   return error?alert(error.message):authView("otp",e);
+  }
+  const{error}=await db.auth.signInWithPassword({email:e,password:p});
+  if(!error)return boot();
+  if(/confirm/i.test(error.message)){await db.auth.resend({type:"signup",email:e});return authView("otp",e);}
+  alert(error.message);
+ };
+}
 
-<div id="modal" hidden><div class="sheet" id="sheet"></div></div>
-<div id="toast" role="status"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="app.js"></script>
-</body>
-</html>
+async function boot(){
+ const{data:{user}}=await db.auth.getUser(); if(!user)return authView();
+ const{data}=await db.from("profiles").select("*").eq("id",user.id).single(); me=data;
+ if(!me||me.banned){await db.auth.signOut();alert("บัญชีนี้ถูกระงับ");return authView();}
+ R.innerHTML=`<div id="app"><div id="sv"></div><div id="ch"></div><div id="main"><div id="top"></div><div id="msgs"></div>
+ <div id="bar"><button class="g" id="at">📎</button><input id="fl" type="file" hidden><input id="tx" type="text" placeholder="พิมพ์ข้อความ... ใช้ @ชื่อ เพื่อแท็ก"><button id="sd">ส่ง</button></div></div></div>`;
+ $("#sd").onclick=send; $("#tx").onkeydown=e=>e.key==="Enter"&&send();
+ $("#at").onclick=()=>$("#fl").click(); $("#fl").onchange=upload;
+ await loadServers();
+}
+async function loadServers(keep){
+ const{data}=await db.from("members").select("servers(*)").eq("user_id",me.id);
+ servers=(data||[]).map(x=>x.servers);
+ $("#sv").innerHTML=servers.map(s=>`<button class="sv ${sv?.id===s.id?"on":""}" data-i="${s.id}" title="${esc(s.name)}">${esc(s.name[0])}</button>`).join("")
+  +`<button class="sv" id="add">＋</button><button class="sv" id="me">👤</button><button class="sv" id="jn" title="ค้นหาชุมชน">🔍</button><button class="sv" id="tm" title="ทีมงานและพันธมิตร">👥</button>`
+  +(me.role!=="member"?`<button class="sv" id="adm" title="หลังบ้าน">⚙️</button>`:"");
+ $("#sv").onclick=e=>{const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.i)pick(+b.dataset.i);else if(b.id==="add")createServer();else if(b.id==="me")profile(me.id);
+  else if(b.id==="jn")discover();else if(b.id==="tm")lists();else if(b.id==="adm")backoffice();};
+ if(!keep&&servers[0])pick(servers[0].id); else if(!servers.length)$("#top").innerHTML="สร้างหรือเข้าร่วมชุมชนทางซ้าย";
+}
+async function pick(id){
+ sv=servers.find(s=>s.id===id);
+ const{data}=await db.from("channels").select("*").eq("server_id",id).order("id"); chans=data||[];
+ const ic={text:"#",voice:"🔊",announce:"📢"};
+ $("#ch").innerHTML=`<h4>${esc(sv.name)}</h4>`+chans.map(c=>`<button class="c ${ch?.id===c.id?"on":""}" data-c="${c.id}">${ic[c.kind]} ${esc(c.name)}</button>`).join("")
+  +(sv.owner===me.id||me.role==="ceo"?`<button class="c" id="nc">＋ ช่อง</button><button class="c" id="nr">＋ ยศ</button><button class="c" id="ar">มอบยศ</button>`:"")+`<button class="c" id="mb">👥 สมาชิก</button>`;
+ $("#ch").onclick=e=>{const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.c)openCh(+b.dataset.c);else if(b.id==="nc")newChan();else if(b.id==="nr")newRole();else if(b.id==="ar")giveRole();else if(b.id==="mb")members();};
+ chans[0]?openCh((chans.find(c=>c.id===ch?.id)||chans[0]).id):($("#msgs").innerHTML="");
+}
+async function openCh(id){
+ ch=chans.find(c=>c.id===id); document.querySelectorAll(".c").forEach(b=>b.classList.toggle("on",+b.dataset.c===id));
+ $("#ch").classList.remove("open");$("#top").innerHTML=`<span><button id="mt" class="g">☰</button> <b>${esc(ch.name)}</b></span>${ch.kind==="voice"?'<span><button id="vc">🎤 เข้าห้องเสียง</button> <button id="ss" class="g">🖥 แชร์หน้าจอ</button></span>':""}`;
+ $("#mt").onclick=()=>$("#ch").classList.toggle("open");
+ if(ch.kind==="voice"){$("#vc").onclick=voice;$("#ss").onclick=share;}
+ const{data}=await db.from("messages").select("*").eq("channel_id",id).order("id").limit(100);
+ const ids=[...new Set((data||[]).map(m=>m.user_id))]; await need(ids);
+ $("#msgs").innerHTML=""; (data||[]).forEach(add); scroll();
+ sub&&db.removeChannel(sub);
+ sub=db.channel("m"+id).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`channel_id=eq.${id}`},async p=>{await need([p.new.user_id]);add(p.new);scroll();}).subscribe();
+}
+async function need(ids){const m=ids.filter(i=>!cache[i]);if(!m.length)return;const{data}=await db.from("profiles").select("*").in("id",m);(data||[]).forEach(p=>cache[p.id]=p);}
+function fmt(t){return esc(t).replace(/@(\S+)/g,(x,n)=>`<span class="men">@${n}</span>`);}
+function add(m){
+ const p=cache[m.user_id],q=m.reply_to&&$(`[data-id="${m.reply_to}"]`);
+ const d=document.createElement("div");d.className="m";d.dataset.id=m.id;
+ const f=m.file_url?(/\.(png|jpe?g|gif|webp)$/i.test(m.file_url)?`<img class="f" src="${esc(m.file_url)}">`:`<a href="${esc(m.file_url)}" target="_blank">📄 ไฟล์แนบ</a>`):"";
+ d.innerHTML=`${q?`<div class="rp">↪ ${esc(q.querySelector("span.t")?.textContent.slice(0,60))}</div>`:""}<span class="av2" style="background-image:url('${esc(p?.avatar_url||"")}')"></span><b data-u="${m.user_id}">${nm(p)}</b>${badge(p)} <small>${new Date(m.created_at).toLocaleTimeString()}</small>
+ <button class="g" data-r="${m.id}" style="padding:0 6px">↩</button><button class="g" data-e="${m.id}" style="padding:0 6px">😀</button><div><span class="t">${fmt(m.content||"")}</span>${f}</div>`;
+ d.onclick=e=>{const t=e.target;if(t.dataset.u)profile(t.dataset.u);
+  if(t.dataset.r){replyTo=+t.dataset.r;$("#tx").placeholder="กำลังตอบกลับ... ";$("#tx").focus();}
+  if(t.dataset.e){const x=prompt("อีโมจิ:","👍");if(x)d.querySelector("div").append(" "+x);}};
+ $("#msgs").append(d);
+}
+const scroll=()=>{const m=$("#msgs");m.scrollTop=m.scrollHeight;};
+async function send(file_url){
+ const t=$("#tx").value.trim(); if(!t&&typeof file_url!=="string"||!ch)return;
+ if(CF&&t&&CF.ccall("has_bad","number",["string"],[t]))return alert("ข้อความมีคำที่ไม่อนุญาต");
+ const{error}=await db.from("messages").insert({channel_id:ch.id,user_id:me.id,content:t,file_url:typeof file_url==="string"?file_url:null,reply_to:replyTo});
+ if(error)alert("ส่งไม่ได้: "+error.message);else{$("#tx").value="";replyTo=null;$("#tx").placeholder="พิมพ์ข้อความ...";}
+}
+async function upload(e){
+ const f=e.target.files[0];if(!f)return; const path=`${me.id}/${Date.now()}_${f.name.replace(/[^\w.]/g,"_")}`;
+ const{error}=await db.storage.from("files").upload(path,f); if(error)return alert(error.message);
+ send(db.storage.from("files").getPublicUrl(path).data.publicUrl);
+}
+function modal(html){const m=document.createElement("div");m.className="modal";m.innerHTML=`<div class="card">${html}</div>`;
+ m.onclick=e=>e.target===m&&m.remove();document.body.append(m);return m;}
+async function profile(id){
+ await need([id]);const p=cache[id]=(await db.from("profiles").select("*").eq("id",id).single()).data;const mine=id===me.id;
+ const{data:posts}=await db.from("posts").select("*").eq("user_id",id).order("id",{ascending:false}).limit(10);
+ const m=modal(`<div class="bn" style="background-image:url('${esc(p.banner_url||"")}')"></div><div class="in"><div class="av" style="background-image:url('${esc(p.avatar_url||"")}')"></div>
+ <h3>${nm(p)} ${badge(p)}</h3><small>@${esc(p.alias)}</small>
+ ${mine?`<textarea id="bio" placeholder="อธิบายโปรไฟล์">${esc(p.bio)}</textarea><input id="av" placeholder="URL รูปโปรไฟล์" value="${esc(p.avatar_url||"")}"><input id="bn" placeholder="URL พื้นหลังโปรไฟล์" value="${esc(p.banner_url||"")}">
+ <input id="cu" placeholder="ลิงก์ช่องสตรีม/ช่องติดตาม" value="${esc(p.channel_url||"")}"><input id="fo" type="number" placeholder="จำนวนผู้ติดตาม (ต้อง 200+ เพื่อยืนยัน)" value="${p.followers||""}">
+ <button id="sv2">บันทึก</button><textarea id="pt" placeholder="โพสต์ใหม่"></textarea><button id="pp">โพสต์</button><button class="g" id="lo">ออกจากระบบ</button>`:`<p>${esc(p.bio)}</p>`}
+ <h4>โพสต์</h4>${(posts||[]).map(x=>`<p>${esc(x.content)}</p>`).join("")||"<small>ยังไม่มีโพสต์</small>"}</div>`);
+ if(mine){$("#sv2",m).onclick=async()=>{await db.from("profiles").update({bio:$("#bio",m).value,avatar_url:$("#av",m).value,banner_url:$("#bn",m).value,channel_url:$("#cu",m).value,followers:+$("#fo",m).value||0}).eq("id",me.id);me=(await db.from("profiles").select("*").eq("id",me.id).single()).data;m.remove();alert("บันทึกแล้ว ทีมงานจะตรวจสอบช่องเพื่อมอบเครื่องหมายยืนยัน");};
+  $("#pp",m).onclick=async()=>{const t=$("#pt",m).value.trim();if(t){await db.from("posts").insert({user_id:me.id,content:t});m.remove();profile(me.id);}};
+  $("#lo",m).onclick=async()=>{await db.auth.signOut();location.reload();};}
+}
+async function createServer(){
+ const n=prompt("ชื่อชุมชน");if(!n)return;
+ const{data:s,error}=await db.from("servers").insert({name:n,owner:me.id}).select().single();if(error)return alert(error.message);
+ await db.from("members").insert({server_id:s.id,user_id:me.id});
+ await db.from("channels").insert([{server_id:s.id,name:"ทั่วไป"},{server_id:s.id,name:"ประกาศ",kind:"announce"},{server_id:s.id,name:"ห้องเสียง",kind:"voice"}]);
+ sv=null;ch=null;await loadServers();pick(s.id);
+}
+async function discover(){
+ const{data}=await db.from("servers").select("*").limit(50);
+ const m=modal(`<div class="in"><h3>ชุมชนทั้งหมด</h3>${(data||[]).map(s=>`<button class="g" data-j="${s.id}">เข้าร่วม ${esc(s.name)}</button>`).join("")}</div>`);
+ m.onclick=async e=>{const j=e.target.dataset?.j;if(j){await db.from("members").insert({server_id:+j,user_id:me.id});m.remove();loadServers(true);}else if(e.target===m)m.remove();};
+}
+async function newChan(){const n=prompt("ชื่อช่อง");if(!n)return;const k=prompt("ชนิด: text / voice / announce","text");
+ const{data:r}=await db.from("roles").select("*").eq("server_id",sv.id);
+ const x=r?.length?prompt("จำกัดเฉพาะยศ (ใส่เลข) หรือเว้นว่างให้ทุกคนเห็น:\n"+r.map(y=>`${y.id} = ${y.name}`).join("\n")):"";
+ const{error}=await db.from("channels").insert({server_id:sv.id,name:n,kind:["text","voice","announce"].includes(k)?k:"text",role_id:+x||null});
+ error&&alert(error.message);pick(sv.id);}
+async function members(){
+ const{data}=await db.from("members").select("user_id,muted").eq("server_id",sv.id);await need(data.map(x=>x.user_id));
+ const own=sv.owner===me.id||me.role==="ceo";
+ const m=modal(`<div class="in"><h3>สมาชิก (${data.length})</h3>${data.map(x=>{const p=cache[x.user_id];return `<div class="mr"><span><span class="av2" style="background-image:url('${esc(p?.avatar_url||"")}')"></span><b data-u="${x.user_id}">${nm(p)}</b>${badge(p)}${x.muted?" 🔇":""}</span>${own&&x.user_id!==me.id?`<span><button class="g" data-a="mu" data-i="${x.user_id}" data-m="${x.muted}">${x.muted?"เปิดเสียง":"ปิดเสียง"}</button> <button class="g" data-a="ki" data-i="${x.user_id}">เตะ</button> <button class="g" data-a="bn" data-i="${x.user_id}">แบน</button></span>`:""}</div>`}).join("")}</div>`);
+ m.onclick=async e=>{const d=e.target.dataset;if(e.target===m)return m.remove();if(d.u){m.remove();return profile(d.u);}if(!d.a)return;
+  const q={server_id:sv.id,user_id:d.i};let r;
+  if(d.a==="mu")r=await db.from("members").update({muted:d.m!=="true"}).match(q);
+  if(d.a==="ki"||d.a==="bn"){if(d.a==="bn")await db.from("server_bans").insert(q);r=await db.from("members").delete().match(q);}
+  if(r?.error)alert(r.error.message);else{m.remove();members();}};
+}
+let CF=null;{const sc=document.createElement("script");sc.src="filter.js";sc.onload=()=>createFilter().then(x=>CF=x);document.head.append(sc);}
+async function newRole(){const n=prompt("ชื่อยศ");if(!n)return;const c=prompt("สี (hex)","#5865f2");await db.from("roles").insert({server_id:sv.id,name:n,color:c});alert("สร้างยศแล้ว");}
+async function giveRole(){
+ const{data:r}=await db.from("roles").select("*").eq("server_id",sv.id);if(!r?.length)return alert("ยังไม่มียศ");
+ const i=+prompt("เลือกยศ (ใส่เลข):\n"+r.map(x=>`${x.id} = ${x.name}`).join("\n"));
+ const a=prompt("นามแฝงของสมาชิก");const{data:u}=await db.from("profiles").select("id").eq("alias",a).maybeSingle();
+ if(!u)return alert("ไม่พบสมาชิก");await db.from("member_roles").insert({role_id:i,user_id:u.id});alert("มอบยศแล้ว");
+}
+async function backoffice(){
+ const{data}=await db.from("profiles").select("*").order("created_at",{ascending:false}).limit(100);
+ data.sort((a,b)=>(b.verify_pending&&!b.verified)-(a.verify_pending&&!a.verified));const ceo=me.role==="ceo";
+ const m=modal(`<div class="in"><h3>หลังบ้าน (${RN[me.role]})</h3>${(data||[]).map(p=>`<div>${nm(p)} ${badge(p)} <small>${esc(p.email)}</small>${p.verify_pending&&!p.verified?`<br>⏳ รอตรวจสอบ (${p.followers} ผู้ติดตาม) ${/^https?:\/\//.test(p.channel_url||"")?`<a href="${esc(p.channel_url)}" target="_blank" rel="noopener">เปิดช่อง</a>`:""}`:""}<br>
+ <button class="g" data-a="role" data-i="${p.id}">ตั้งยศ</button><button class="g" data-a="ver" data-i="${p.id}">${p.verified?"ถอน":"ให้"}✔</button>
+ ${ceo?`<button class="g" data-a="ban" data-i="${p.id}">${p.banned?"ปลดแบน":"แบน"}</button><button class="g" data-a="del" data-i="${p.id}">ลบโปรไฟล์</button>`:""}</div>`).join("")}</div>`);
+ m.onclick=async e=>{const d=e.target.dataset;if(e.target===m)return m.remove();if(!d.a)return;const p=data.find(x=>x.id===d.i);let r;
+  if(d.a==="role"){const v=prompt("member / staff"+(ceo?" / admin / vceo / ceo":""),p.role);if(v)r=await db.from("profiles").update({role:v}).eq("id",p.id);}
+  if(d.a==="ver")r=await db.from("profiles").update({verified:!p.verified,verify_pending:false}).eq("id",p.id);
+  if(d.a==="ban")r=await db.from("profiles").update({banned:!p.banned}).eq("id",p.id);
+  if(d.a==="del"&&confirm("ลบโปรไฟล์นี้?"))r=await db.from("profiles").delete().eq("id",p.id);
+  if(r?.error)alert(r.error.message);else if(r){m.remove();backoffice();}};
+}
+/* ห้องเสียง + แชร์หน้าจอ จริง (WebRTC mesh, ส่งสัญญาณผ่าน Supabase Realtime) */
+let ls,vch,scr,peers={};const VID=crypto.randomUUID(),ICE={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
+const sig=(t,to,d)=>vch.send({type:"broadcast",event:"s",payload:{t,to,from:VID,d}});
+function mk(id,init){
+ if(peers[id])return peers[id];const pc=new RTCPeerConnection(ICE);peers[id]=pc;pc.ready=init;
+ ls.getTracks().forEach(t=>pc.addTrack(t,ls));scr&&pc.addTrack(scr.getVideoTracks()[0],scr);
+ pc.onicecandidate=e=>e.candidate&&sig("ice",id,e.candidate);
+ pc.onnegotiationneeded=async()=>{if(!pc.ready)return;await pc.setLocalDescription(await pc.createOffer());sig("sdp",id,pc.localDescription);};
+ pc.ontrack=e=>{const v=e.track.kind==="video",k="r"+id+(v?"v":"a");let el=document.getElementById(k);
+  if(!el){el=document.createElement(v?"video":"audio");el.id=k;el.autoplay=true;el.playsInline=true;if(v)el.style.cssText="max-width:100%;border-radius:8px";$("#msgs").prepend(el);}el.srcObject=e.streams[0];};
+ return pc;}
+async function voice(){
+ if(vch)return leave();
+ try{ls=await navigator.mediaDevices.getUserMedia({audio:true});}catch(e){return alert("เปิดไมค์ไม่ได้");}
+ vch=db.channel("v"+ch.id);
+ vch.on("broadcast",{event:"s"},async({payload:p})=>{
+  if(p.to!==VID&&p.to!=="*"||p.from===VID)return;
+  if(p.t==="hello")return mk(p.from,true);
+  if(p.t==="bye"){peers[p.from]?.close();delete peers[p.from];["a","v"].forEach(x=>document.getElementById("r"+p.from+x)?.remove());return;}
+  const pc=mk(p.from,false);
+  if(p.t==="sdp"){await pc.setRemoteDescription(p.d);if(p.d.type==="offer"){await pc.setLocalDescription(await pc.createAnswer());sig("sdp",p.from,pc.localDescription);pc.ready=true;}}
+  else try{await pc.addIceCandidate(p.d)}catch(e){}
+ }).subscribe(st=>st==="SUBSCRIBED"&&sig("hello","*"));
+ $("#vc").textContent="📴 ออกจากห้องเสียง";
+}
+function leave(){sig("bye","*");Object.values(peers).forEach(p=>p.close());peers={};ls?.getTracks().forEach(t=>t.stop());scr?.getTracks().forEach(t=>t.stop());scr=null;db.removeChannel(vch);vch=null;$("#vc")&&($("#vc").textContent="🎤 เข้าห้องเสียง");}
+async function share(){
+ if(!vch)return alert("เข้าห้องเสียงก่อน");
+ try{scr=await navigator.mediaDevices.getDisplayMedia({video:true});const t=scr.getVideoTracks()[0];
+  Object.values(peers).forEach(pc=>{pc.addTrack(t,scr);pc.ready=true;});t.onended=()=>{scr=null;};}catch(e){}}
+async function lists(){
+ const[{data:t},{data:p}]=await Promise.all([db.from("team_list").select("*"),db.from("partners").select("*")]);const ed=me.role!=="member"&&me.role!=="staff";
+ const m=modal(`<div class="in"><h3>รายชื่อทีมงาน</h3>${(t||[]).map(x=>`<div>${esc(x.name)} <small>${esc(x.title)}</small> ${ed?`<button class="g" data-d="team_list" data-i="${x.id}">ลบ</button>`:""}</div>`).join("")||"<small>ยังไม่มี</small>"}
+ ${ed?'<button id="at2">＋ เพิ่มทีมงาน</button>':""}<h3>พันธมิตร</h3>${(p||[]).map(x=>`<div><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a> ${ed?`<button class="g" data-d="partners" data-i="${x.id}">ลบ</button>`:""}</div>`).join("")||"<small>ยังไม่มี</small>"}
+ ${ed?'<button id="ap2">＋ เพิ่มพันธมิตร</button>':""}</div>`);
+ const done=r=>{if(r.error)alert(r.error.message);else{m.remove();lists();}};
+ if(ed){$("#at2",m).onclick=async()=>{const n=prompt("ชื่อ"),ti=prompt("ตำแหน่ง");n&&done(await db.from("team_list").insert({name:n,title:ti}));};
+  $("#ap2",m).onclick=async()=>{const n=prompt("ชื่อพันธมิตร"),u=prompt("ลิงก์ (https://...)");n&&done(await db.from("partners").insert({name:n,url:/^https?:\/\//.test(u)?u:"#"}));};}
+ m.addEventListener("click",async e=>{const d=e.target.dataset;if(d?.d)done(await db.from(d.d).delete().eq("id",d.i));});
+}
+boot();
+</script></body></html>
