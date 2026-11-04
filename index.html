@@ -8,12 +8,12 @@
  <form id="fR" class="hide"><input name="display_name" placeholder="ชื่อ (xbox)" required><input name="age" placeholder="อายุ (oc)" required><input name="alias" placeholder="นามแฝง" required>
   <input name="email" type="email" placeholder="อีเมล" required><input name="password" type="password" minlength="6" placeholder="รหัสผ่าน" required><button>ขอรหัส OTP</button></form>
  <form id="fL"><input name="email" type="email" placeholder="อีเมล" required><input name="password" type="password" placeholder="รหัสผ่าน" required><button>ขอรหัส OTP</button></form>
- <form id="fO" class="hide"><p id="otpMsg"></p><input name="token" inputmode="numeric" placeholder="รหัส OTP จากอีเมล" required><button>ยืนยัน</button></form>
- <p id="err" class="err"></p></div></div>
+ <form id="fO" class="hide"><p id="otpMsg"></p><input name="token" inputmode="numeric" placeholder="รหัส OTP จากอีเมล" required><button>ยืนยัน</button><button type="button" id="rs" style="background:var(--bg);color:var(--tx)">ส่งรหัสใหม่</button></form>
+ <p id="err" class="err"></p><p><a href="#" onclick="setupCfg();return false" style="color:var(--mu);font-size:13px">⚙ ตั้งค่าการเชื่อมต่อ Supabase</a></p></div></div>
 <div id="app" class="hide">
  <nav id="rail"></nav>
  <aside id="side"><header id="srvName"></header><div id="chans"></div><div id="me"></div></aside>
- <main><header id="top"><button id="menu">☰</button><b id="chName"></b><span class="sp"></span><button id="vcBtn" class="hide">🎤 เข้าห้องเสียง</button><button id="scr" class="hide">🖥 แชร์จอ</button><button id="memBtn">👥</button></header>
+ <main><header id="top"><button id="menu">☰</button><b id="chName"></b><span class="sp"></span><button id="vcBtn" class="hide">🎤 เข้าห้องเสียง</button><button id="mute" class="hide">🔇 ปิดไมค์</button><button id="scr" class="hide">🖥 แชร์จอ</button><button id="memBtn">👥</button></header>
   <div id="msgs"></div><div id="reply" class="hide"></div>
   <form id="send"><label class="ic">＋<input type="file" id="file" hidden></label><input id="txt" placeholder="ส่งข้อความ... (@ชื่อ เพื่อแท็ก)" autocomplete="off"><button>ส่ง</button></form>
   <div id="vc" class="hide"></div></main>

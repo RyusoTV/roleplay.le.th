@@ -1,5 +1,12 @@
 const $=s=>document.querySelector(s), esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY);
+const LS=(()=>{try{return JSON.parse(localStorage.getItem('civ_cfg')||'null')}catch{return null}})(),C={...CFG,...(LS||{})};
+const isSvc=k=>{try{return JSON.parse(atob(k.split('.')[1])).role==='service_role'}catch{return false}};
+const okCfg=/^https:\/\/\S+$/.test(C.SUPABASE_URL||'')&&!/YOUR-/.test(C.SUPABASE_URL+C.SUPABASE_ANON_KEY)&&(C.SUPABASE_ANON_KEY||'').length>20&&!isSvc(C.SUPABASE_ANON_KEY);
+const sb=okCfg?supabase.createClient(C.SUPABASE_URL.replace(/\/+$/,''),C.SUPABASE_ANON_KEY):null;
+const em=m=>/fetch|network/i.test(m)?'เชื่อมต่อ Supabase ไม่ได้ — ตรวจ Project URL/anon key (กด ⚙ ตั้งค่า) และดูว่าโปรเจกต์ไม่ถูก pause':/rate limit|seconds|too many/i.test(m)?'ขอรหัสถี่เกินไปหรือเกินโควตาอีเมล รอสักครู่ (ถ้าเกิดบ่อยให้ตั้ง SMTP ของตัวเองใน Supabase)':m;
+window.setupCfg=()=>openModal(`<b>เชื่อมต่อ Supabase</b><p class="mu">Supabase → Project Settings → API: คัดลอก Project URL และ anon (publishable) key</p><input id="cu" placeholder="https://xxxx.supabase.co" value="${okCfg?esc(C.SUPABASE_URL):''}"><input id="ck2" placeholder="anon public key"><button onclick="saveCfg()">บันทึก</button><button onclick="localStorage.removeItem('civ_cfg');location.reload()" style="background:var(--bg);color:var(--tx)">ล้างค่า</button>`);
+window.saveCfg=()=>{const u=$('#cu').value.trim().replace(/\/+$/,''),k=$('#ck2').value.trim();if(!/^https:\/\/\S+$/.test(u)||k.length<20)return alert('URL หรือ key ไม่ถูกต้อง');if(isSvc(k))return alert('นี่คือ service_role key ห้ามใช้ในเว็บ ให้ใช้ anon key');localStorage.setItem('civ_cfg',JSON.stringify({SUPABASE_URL:u,SUPABASE_ANON_KEY:k}));location.reload()};
+const need=()=>{if(sb)return false;err('ยังไม่ได้ตั้งค่า Supabase');setupCfg();return true};
 const RANK={member:1,staff:2,board:3,vice_ceo:4,ceo:5},LABEL={member:'สมาชิก',staff:'ทีมงาน',board:'คณะบริหาร',vice_ceo:'รองCEO',ceo:'CEO'};
 const EMO=['👍','❤️','😂','😮','😢','🔥','🎉','👀'];
 let me,srv,ch,srvs=[],chs=[],P={},sub,replyTo=null,pend=null;
@@ -9,8 +16,8 @@ const badge=u=>`${u?.verified?'<span class="ver" title="ยืนยันตั
 // ---------- Loading ----------
 let ld=0;const li=setInterval(()=>{ld=Math.min(ld+Math.random()*12,95);$("#bar").style.width=ld+"%";$("#pct").textContent=Math.floor(ld)+"%"},120);
 async function boot(){
-  const {data:{session}}=await sb.auth.getSession();
-  if(session){await enter()}else show('#auth');
+  try{if(!sb){show('#auth');err('ยังไม่ได้ตั้งค่า Supabase — กด “⚙ ตั้งค่าการเชื่อมต่อ” ด้านล่าง')}
+   else{const {data:{session}}=await sb.auth.getSession();session?await enter():show('#auth')}}catch(e){show('#auth');err(em(e.message))}
   clearInterval(li);$('#bar').style.width='100%';$('#pct').textContent='100%';setTimeout(()=>{$('#splash').style.opacity=0;setTimeout(()=>$('#splash').remove(),600)},300);
 }
 function show(id){['#auth','#app'].forEach(x=>$(x).classList.add('hide'));$(id).classList.remove('hide')}
@@ -19,19 +26,27 @@ const err=m=>$('#err').textContent=m||'';let flow=null;
 $('#tL').onclick=()=>{$('#fL').classList.remove('hide');$('#fR').classList.add('hide');$('#fO').classList.add('hide');$('#tL').classList.add('on');$('#tR').classList.remove('on')};
 $('#tR').onclick=()=>{$('#fR').classList.remove('hide');$('#fL').classList.add('hide');$('#fO').classList.add('hide');$('#tR').classList.add('on');$('#tL').classList.remove('on')};
 function askOtp(email,type){flow={email,type};$('#fL').classList.add('hide');$('#fR').classList.add('hide');$('#fO').classList.remove('hide');$('#otpMsg').textContent='ส่งรหัสไปที่ '+email+' แล้ว';err()}
-$('#fR').onsubmit=async e=>{e.preventDefault();err();const f=Object.fromEntries(new FormData(e.target));
-  const {error}=await sb.auth.signUp({email:f.email,password:f.password,options:{data:{display_name:f.display_name,age:f.age,alias:f.alias}}});
-  error?err(error.message):askOtp(f.email,'signup')};
-$('#fL').onsubmit=async e=>{e.preventDefault();err();const f=Object.fromEntries(new FormData(e.target));
-  const {error}=await sb.auth.signInWithPassword(f);if(error)return err('อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้ยืนยัน OTP');
+$('#fR').onsubmit=async e=>{e.preventDefault();err();if(need())return;const f=Object.fromEntries(new FormData(e.target));f.email=f.email.trim().toLowerCase();
+  try{const {data,error}=await sb.auth.signUp({email:f.email,password:f.password,options:{data:{display_name:f.display_name,age:f.age,alias:f.alias}}});
+  if(error)return err(em(error.message));
+  if(data.user&&data.user.identities&&data.user.identities.length==0)return err('อีเมลนี้สมัครไว้แล้ว กรุณาเข้าสู่ระบบ');
+  if(data.session)return enter(); // กรณีปิด Confirm email ใน Supabase
+  askOtp(f.email,'signup')}catch(x){err(em(x.message))}};
+$('#fL').onsubmit=async e=>{e.preventDefault();err();if(need())return;const f=Object.fromEntries(new FormData(e.target));f.email=f.email.trim().toLowerCase();
+  try{const {error}=await sb.auth.signInWithPassword(f);
+  if(error){if(/not confirmed/i.test(error.message)){await sb.auth.resend({type:'signup',email:f.email});return askOtp(f.email,'signup')}return err(/invalid/i.test(error.message)?'อีเมลหรือรหัสผ่านไม่ถูกต้อง':em(error.message))}
   await sb.auth.signOut();const r=await sb.auth.signInWithOtp({email:f.email,options:{shouldCreateUser:false}});
-  r.error?err(r.error.message):askOtp(f.email,'email')};
-$('#fO').onsubmit=async e=>{e.preventDefault();err();const token=new FormData(e.target).get('token').trim();
-  const {error}=await sb.auth.verifyOtp({email:flow.email,token,type:flow.type});error?err('รหัสไม่ถูกต้องหรือหมดอายุ'):enter()};
+  r.error?err(em(r.error.message)):askOtp(f.email,'email')}catch(x){err(em(x.message))}};
+$('#fO').onsubmit=async e=>{e.preventDefault();err();if(need())return;const token=new FormData(e.target).get('token').trim();
+  try{let r=await sb.auth.verifyOtp({email:flow.email,token,type:flow.type});
+  if(r.error&&flow.type=='signup')r=await sb.auth.verifyOtp({email:flow.email,token,type:'email'});
+  r.error?err('รหัสไม่ถูกต้องหรือหมดอายุ'):enter()}catch(x){err(em(x.message))}};
+$('#rs').onclick=async()=>{if(!flow)return;const r=flow.type=='signup'?await sb.auth.resend({type:'signup',email:flow.email}):await sb.auth.signInWithOtp({email:flow.email,options:{shouldCreateUser:false}});err(r.error?em(r.error.message):'ส่งรหัสใหม่แล้ว')};
 async function enter(){
   const {data:{user}}=await sb.auth.getUser();
-  const {data}=await sb.from('profiles').select('*').eq('id',user.id).single();me=data;
-  if(!me||me.banned){await sb.auth.signOut();show('#auth');return err('บัญชีนี้ถูกระงับ')}
+  let {data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+  if(!data){const m=user.user_metadata||{};const r=await sb.from('profiles').insert({id:user.id,display_name:m.display_name||user.email.split('@')[0],xbox_name:m.display_name,age:m.age,alias:m.alias||m.display_name||'user'}).select().single();data=r.data}
+  me=data;if(!me||me.banned){await sb.auth.signOut();show('#auth');return err('บัญชีนี้ถูกระงับหรือโหลดโปรไฟล์ไม่ได้ (ตรวจว่ารัน schema.sql แล้ว)')}
   show('#app');await loadServers();
 }
 // ---------- Servers / Channels ----------
@@ -51,11 +66,12 @@ async function loadMembers(){const {data}=await sb.from('members').select('profi
   $('#mem').innerHTML=`<b>สมาชิก ${us.length}</b>`+us.map(u=>`<div class="u" onclick="showProfile('${u.id}')">${avatar(u)}<span>${name(u)}${badge(u)}</span></div>`).join('')}
 window.pickCh=async id=>{ch=chs.find(c=>c.id==id);document.querySelectorAll('.ch').forEach(e=>e.classList.toggle('on',e.dataset.id==id));
   $('#side').classList.remove('open');$('#chName').textContent=ch.name;
-  const v=ch.kind=='voice';$('#vcBtn').classList.toggle('hide',!v);if(v){return}
+  const v=ch.kind=='voice';$('#vcBtn').classList.toggle('hide',!v);$('#send').classList.toggle('hide',v||(ch.kind=='announce'&&rank(me)<2));$('#vcBtn').textContent=(vch&&vchId==ch.id)?'📴 ออกจากห้อง':'🎤 เข้าห้องเสียง';
+  if(v){$('#msgs').innerHTML='<p class="mu" style="padding:14px">🔊 ห้องเสียง — กด “เข้าห้องเสียง” (เข้าได้ไม่จำกัดจำนวนคน)</p>';return}
   $('#msgs').innerHTML='';const {data}=await sb.from('messages').select('*,reactions(*)').eq('channel_id',id).order('created_at').limit(100);
   for(const m of data||[])await addMsg(m);$('#msgs').scrollTop=1e9;
   sub&&sb.removeChannel(sub);sub=sb.channel('c'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'channel_id=eq.'+id},async p=>{await addMsg({...p.new,reactions:[]});$('#msgs').scrollTop=1e9})
-   .on('postgres_changes',{event:'*',schema:'public',table:'reactions'},()=>pickCh.refresh&&0)
+   .on('postgres_changes',{event:'*',schema:'public',table:'reactions'},async p=>{const id=p.new?.message_id||p.old?.message_id;if(!id||!document.getElementById('m'+id))return;const {data}=await sb.from('reactions').select('*').eq('message_id',id);drawRx(id,data||[])})
    .on('postgres_changes',{event:'DELETE',schema:'public',table:'messages'},p=>document.getElementById('m'+p.old.id)?.remove()).subscribe();
   $('#send').classList.toggle('hide',ch.kind=='announce'&&rank(me)<2)};
 async function user(id){if(!P[id]){const {data}=await sb.from('profiles').select('*').eq('id',id).single();P[id]=data}return P[id]}
@@ -83,26 +99,39 @@ $('#send').onsubmit=async e=>{e.preventDefault();const content=$('#txt').value.t
   try{if(pend){row.file_url=await upload(pend);row.file_name=pend.name}}catch(x){return alert('อัปโหลดไม่สำเร็จ: '+x.message)}
   const {error}=await sb.from('messages').insert(row);if(error)return alert(error.message);
   $('#txt').value='';pend=null;$('#file').value='';$('#txt').placeholder='ส่งข้อความ... (@ชื่อ เพื่อแท็ก)';replyTo=null;$('#reply').classList.add('hide')};
-// ---------- Voice (WebRTC) + แชร์หน้าจอ ----------
-let vch,peers={},mic,screen;const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
-$('#vcBtn').onclick=async()=>{if(vch){leave();return}
-  try{mic=await navigator.mediaDevices.getUserMedia({audio:true})}catch{return alert('ต้องอนุญาตไมค์')}
-  $('#vcBtn').textContent='📴 ออกจากห้อง';$('#scr').classList.remove('hide');$('#vc').classList.remove('hide');
-  vch=sb.channel('voice:'+ch.id,{config:{presence:{key:me.id},broadcast:{self:false}}});
-  vch.on('broadcast',{event:'sig'},({payload:p})=>p.to==me.id&&onSig(p))
-   .on('presence',{event:'join'},({key})=>{if(key!=me.id&&me.id>key)call(key)}).on('presence',{event:'leave'},({key})=>drop(key))
-   .subscribe(s=>s=='SUBSCRIBED'&&vch.track({u:me.id}))};
-function pc(id){if(peers[id])return peers[id];const p=new RTCPeerConnection(ICE);peers[id]=p;mic.getTracks().forEach(t=>p.addTrack(t,mic));
+// ---------- Voice (WebRTC mesh, perfect negotiation) + แชร์หน้าจอ — ไม่จำกัดจำนวนคน ----------
+let vch,vchId,peers={},mic,screen;const ICE={iceServers:C.ICE||[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+const vcCount=()=>{const n=Object.keys(peers).length+1;$('#vcInfo').textContent=`🔊 ในห้อง ${n} คน`};
+$('#vcBtn').onclick=async()=>{if(vch&&vchId==ch.id)return leave();if(vch)leave();await joinVoice()};
+async function joinVoice(){
+  try{mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch{return alert('ต้องอนุญาตไมค์ และต้องเปิดเว็บผ่าน https')}
+  vchId=ch.id;$('#vcBtn').textContent='📴 ออกจากห้อง';['#scr','#mute'].forEach(s=>$(s).classList.remove('hide'));$('#vc').classList.remove('hide');$('#vc').innerHTML='<div id="vcInfo" class="mu" style="width:100%"></div>';vcCount();
+  vch=sb.channel('voice:'+vchId,{config:{presence:{key:me.id},broadcast:{self:false}}});
+  vch.on('broadcast',{event:'sig'},({payload:p})=>{if(p.to==me.id)onSig(p)})
+   .on('presence',{event:'join'},({key})=>{if(key!=me.id)pc(key)}).on('presence',{event:'leave'},({key})=>drop(key))
+   .subscribe(s=>{if(s=='SUBSCRIBED')vch.track({u:me.id})})}
+const sig=(to,x)=>vch&&vch.send({type:'broadcast',event:'sig',payload:{to,from:me.id,...x}});
+function pc(id){if(peers[id])return peers[id].p;
+  const p=new RTCPeerConnection(ICE),st={p,polite:me.id<id,making:false,ignore:false,els:[]};peers[id]=st;vcCount();
+  mic.getTracks().forEach(t=>p.addTrack(t,mic));if(screen)screen.getTracks().forEach(t=>p.addTrack(t,screen));
   p.onicecandidate=e=>e.candidate&&sig(id,{c:e.candidate});
-  p.ontrack=e=>{let v=document.getElementById('v'+id);if(!v){v=document.createElement('video');v.id='v'+id;v.autoplay=true;v.playsInline=true;$('#vc').appendChild(v)}v.srcObject=e.streams[0]};
-  p.onnegotiationneeded=async()=>{if(p.signalingState!='stable')return;await p.setLocalDescription(await p.createOffer());sig(id,{d:p.localDescription})};return p}
-const sig=(to,x)=>vch.send({type:'broadcast',event:'sig',payload:{to,from:me.id,...x}});
-const call=id=>pc(id);
-async function onSig(p){const c=pc(p.from);if(p.d){await c.setRemoteDescription(p.d);if(p.d.type=='offer'){await c.setLocalDescription(await c.createAnswer());sig(p.from,{d:c.localDescription})}}else if(p.c)try{await c.addIceCandidate(p.c)}catch{}}
-function drop(id){peers[id]?.close();delete peers[id];document.getElementById('v'+id)?.remove()}
-function leave(){Object.keys(peers).forEach(drop);mic?.getTracks().forEach(t=>t.stop());screen?.getTracks().forEach(t=>t.stop());sb.removeChannel(vch);vch=null;$('#vc').innerHTML='';$('#vc').classList.add('hide');$('#scr').classList.add('hide');$('#vcBtn').textContent='🎤 เข้าห้องเสียง'}
-$('#scr').onclick=async()=>{try{screen=await navigator.mediaDevices.getDisplayMedia({video:true});}catch{return}
-  Object.values(peers).forEach(p=>p.addTrack(screen.getVideoTracks()[0],screen));screen.getVideoTracks()[0].onended=()=>{Object.values(peers).forEach(p=>p.getSenders().filter(s=>s.track?.kind=='video').forEach(s=>p.removeTrack(s)))}};
+  p.ontrack=e=>{const s=e.streams[0];if(!s)return;let v=document.getElementById('s'+s.id);if(!v){v=document.createElement('video');v.id='s'+s.id;v.autoplay=true;v.playsInline=true;v.srcObject=s;$('#vc').appendChild(v);st.els.push(v);s.onremovetrack=()=>{if(!s.getTracks().length)v.remove()}}
+    v.style.display=s.getVideoTracks().length?'':'none';v.play?.().catch(()=>{})};
+  p.onnegotiationneeded=async()=>{try{st.making=true;await p.setLocalDescription();sig(id,{d:p.localDescription})}catch(e){console.warn(e)}finally{st.making=false}};
+  p.onconnectionstatechange=()=>{if(p.connectionState=='failed')p.restartIce()};
+  return p}
+async function onSig(m){pc(m.from);const s=peers[m.from],p=s.p;
+  try{if(m.d){const col=m.d.type=='offer'&&(s.making||p.signalingState!='stable');s.ignore=!s.polite&&col;if(s.ignore)return;
+    await p.setRemoteDescription(m.d);if(m.d.type=='offer'){await p.setLocalDescription();sig(m.from,{d:p.localDescription})}}
+   else if(m.c){try{await p.addIceCandidate(m.c)}catch(e){if(!s.ignore)throw e}}}catch(e){console.warn(e)}}
+function drop(id){const s=peers[id];if(!s)return;s.p.close();s.els.forEach(v=>v.remove());delete peers[id];vch&&vcCount()}
+function leave(){stopScreen();Object.keys(peers).forEach(drop);mic?.getTracks().forEach(t=>t.stop());vch&&sb.removeChannel(vch);vch=null;vchId=null;$('#vc').innerHTML='';$('#vc').classList.add('hide');['#scr','#mute'].forEach(s=>$(s).classList.add('hide'));$('#vcBtn').textContent='🎤 เข้าห้องเสียง'}
+$('#mute').onclick=()=>{const t=mic?.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;$('#mute').textContent=t.enabled?'🔇 ปิดไมค์':'🎙 เปิดไมค์'};
+function stopScreen(){if(!screen)return;const tr=screen.getTracks();tr.forEach(t=>t.stop());Object.values(peers).forEach(st=>st.p.getSenders().filter(s=>s.track&&tr.includes(s.track)).forEach(s=>st.p.removeTrack(s)));screen=null;$('#scr').textContent='🖥 แชร์จอ'}
+$('#scr').onclick=async()=>{if(screen)return stopScreen();
+  try{screen=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true})}catch{return alert('แชร์หน้าจอไม่ได้ (บางเบราว์เซอร์บนมือถือไม่รองรับ)')}
+  screen.getVideoTracks()[0].onended=stopScreen;Object.values(peers).forEach(st=>screen.getTracks().forEach(t=>st.p.addTrack(t,screen)));$('#scr').textContent='⏹ หยุดแชร์'};
+addEventListener('pagehide',()=>vch&&leave());
 // ---------- Profile / Posts / Verify ----------
 function openModal(h){$('#mbody').innerHTML=h;modal.classList.remove('hide')}
 window.showProfile=async id=>{const u=await user(id);const {data:ps}=await sb.from('posts').select('*').eq('user_id',id).order('created_at',{ascending:false}).limit(20);const own=id==me.id;
@@ -136,7 +165,7 @@ window.adminPanel=async()=>{const {data:us}=await sb.from('profiles').select('*'
 window.setSt=async(id,s)=>{const {error}=await sb.from('profiles').update({status:s}).eq('id',id);error&&alert(error.message);delete P[id]};
 window.ban=async(id,b)=>{await sb.from('profiles').update({banned:b}).eq('id',id);adminPanel()};
 window.setV=async(id,v)=>{await sb.from('profiles').update({verified:v}).eq('id',id);adminPanel()};
-window.blk=async id=>{const u=P[id]||(await user(id));await sb.from('blacklist').insert({email:u.email});await sb.from('profiles').update({banned:true}).eq('id',id);adminPanel()};
+window.blk=async id=>{const {data}=await sb.from('user_emails').select('email').eq('id',id).single();if(data)await sb.from('blacklist').upsert({email:data.email.toLowerCase()});await sb.from('profiles').update({banned:true}).eq('id',id);adminPanel()};
 window.delU=async id=>{if(confirm('ลบโปรไฟล์นี้?')){await sb.from('profiles').delete().eq('id',id);adminPanel()}};
 window.addTeam=async()=>{await sb.from('team_list').insert({kind:$('#tk').value,name:$('#tn').value,link:$('#tl').value});alert('เพิ่มแล้ว')};
 // ---------- มือถือ ----------
