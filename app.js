@@ -18,7 +18,7 @@ let me,srv,ch,srvs=[],allSrv=[],chs=[],members=[],roles=[],mroles=[],P={},MC={},
 const rank=u=>RANK[u?.status]||1,isMgr=()=>!!srv&&(srv.owner==me.id||rank(me)==5),canPost=()=>ch&&(ch.kind!='announce'||rank(me)>=2||isMgr());
 const roleOf=id=>mroles.filter(m=>m.user_id==id).map(m=>roles.find(r=>r.id==m.role_id)).filter(Boolean);
 const dn=u=>esc(u?.alias||u?.display_name||'?'),colr=u=>/^#[0-9a-f]{6}$/i.test(roleOf(u?.id)[0]?.color||'')?roleOf(u.id)[0].color:'';
-const name=u=>`<span ${colr(u)?`style="color:${colr(u)}"`:''}>${dn(u)}</span> <span class="xb">(${esc(u?.display_name)})</span>`;
+const name=u=>{const d=deco(u),st=d.g1&&d.g2?`background:linear-gradient(90deg,${d.g1},${d.g2});-webkit-background-clip:text;background-clip:text;color:transparent`:d.color?`color:${d.color}`:'';return `${icoHtml(d.front,'dico')}<span style="${st}">${dn(u)}</span> <span class="xb">(${esc(u?.display_name)})</span>`};
 const avatar=(u,c='')=>`<div class="av ${c} ${online.has(u?.id)?'on':''}" ${u?.avatar_url?`style="background-image:url('${esc(u.avatar_url)}')"`:''} onclick="showProfile('${u?.id}')">${u?.avatar_url?'':esc((u?.alias||'?')[0].toUpperCase())}</div>`;
 const badge=u=>`${u?.verified?'<span class="ver" title="ยืนยันตัวตน">✔</span>':''}${rank(u)>1?`<span class="tag">${LABEL[u.status]}</span>`:''}`;
 const tm=d=>{const x=new Date(d),t=x.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});return x.toDateString()==new Date().toDateString()?t:x.toLocaleDateString('th-TH',{day:'numeric',month:'short'})+' '+t};
@@ -30,7 +30,7 @@ function openModal(h){$('#mbody').innerHTML=h;$('#modal').classList.remove('hide
 const closeModal=()=>$('#modal').classList.add('hide');$('#mx').onclick=closeModal;$('#modal').onmousedown=e=>{if(e.target.id=='modal')closeModal()};
 const closeNav=()=>{$('#app').classList.remove('nav','memo');$('#scrim').classList.add('hide')};
 function shrink(file,max){return new Promise(res=>{if(!/^image\/(png|jpe?g|webp)$/.test(file.type))return res(file);const i=new Image(),u=URL.createObjectURL(file);i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);c.getContext('2d').drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>res(b?new File([b],file.name.replace(/\.\w+$/,'')+'.webp',{type:'image/webp'}):file),'image/webp',.9)};i.onerror=()=>res(file);i.src=u})}
-async function upload(file){if(file.size>50*1024*1024)throw new Error('ไฟล์ใหญ่เกิน 50MB');const path=`${me.id}/${Date.now()}_${file.name.replace(/[^\w.-]/g,'_')}`;const {error}=await sb.storage.from('uploads').upload(path,file,{contentType:file.type||'application/octet-stream',cacheControl:'3600'});if(error)throw error;return sb.storage.from('uploads').getPublicUrl(path).data.publicUrl}
+async function upload(file){if(file.size>50*1024*1024)throw new Error('ไฟล์ใหญ่เกิน 50MB');const path=`${me.id}/${Date.now()}_${file.name.replace(/[^\w.-]/g,'_')}`;const {error}=await sb.storage.from('uploads').upload(path,file,{contentType:file.type||'application/octet-stream',cacheControl:'3600'});if(error)throw new Error(/bucket not found/i.test(error.message)?'ยังไม่มีที่เก็บไฟล์ "uploads" — รัน supabase/fix_storage.sql ใน Supabase (ดู README)':error.message);return sb.storage.from('uploads').getPublicUrl(path).data.publicUrl}
 const must=r=>{if(r.error)throw r.error;if(Array.isArray(r.data)&&!r.data.length)throw new Error('ไม่มีสิทธิ์หรือไม่พบข้อมูล');return r.data};
 window.viewImg=u=>openModal(`<img class="big" src="${esc(u)}"><a href="${esc(u)}" target="_blank" rel="noopener">เปิดภาพเต็ม</a>`);
 // ---------- Boot / Auth (ไม่มี OTP) ----------
@@ -54,7 +54,7 @@ async function enter(){
   let {data}=await sb.from('profiles').select('*').eq('id',au.id).maybeSingle();
   if(!data){const m=au.user_metadata||{};const r=await sb.from('profiles').insert({id:au.id,display_name:m.display_name||au.email.split('@')[0],xbox_name:m.display_name,age:m.age,alias:m.alias||m.display_name||'user'}).select().single();data=r.data}
   me=data;if(!me||me.banned){await sb.auth.signOut();show('#auth');return err('บัญชีนี้ถูกระงับ หรือโหลดโปรไฟล์ไม่ได้ (ตรวจว่ารัน schema.sql แล้ว)')}
-  P[me.id]=me;show('#app');initPresence();await loadServers()}
+  P[me.id]=me;show('#app');initPresence();await loadServers();startBots()}
 function initPresence(){if(presenceOn)return;presenceOn=true;const c=sb.channel('online',{config:{presence:{key:me.id}}});c.on('presence',{event:'sync'},()=>{online=new Set(Object.keys(c.presenceState()));srv&&view=='srv'&&renderMembers()}).subscribe(s=>s=='SUBSCRIBED'&&c.track({t:Date.now()}))}
 const logout=async()=>{await sb.auth.signOut();location.reload()};
 // ---------- Servers ----------
@@ -77,7 +77,7 @@ function renderChans(){const t=chs.filter(c=>c.kind!='voice'),v=chs.filter(c=>c.
 async function loadMembers(){const {data}=await sb.from('members').select('user_id').eq('server_id',srv.id);const ids=(data||[]).map(x=>x.user_id);
   const {data:us}=ids.length?await sb.from('profiles').select('*').in('id',ids):{data:[]};members=us||[];members.forEach(u=>P[u.id]=u);buildMention();renderMembers()}
 function renderMembers(){const s=[...members].sort((a,b)=>(online.has(b.id)-online.has(a.id))||(rank(b)-rank(a)));const n=s.filter(u=>online.has(u.id)).length;
-  $('#mem').innerHTML=`<div class="cat">ออนไลน์ ${n} · ทั้งหมด ${s.length}</div>`+s.map(u=>`<div class="u ${online.has(u.id)?'':'off'}" onclick="showProfile('${u.id}')">${avatar(u,'sm')}<div style="min-width:0"><div>${name(u)}</div><div>${badge(u)}</div></div></div>`).join('')}
+  $('#mem').innerHTML=`<div class="cat">ออนไลน์ ${n} · ทั้งหมด ${s.length}</div>`+s.map(u=>`<div class="u ${online.has(u.id)?'':'off'}" onclick="showProfile('${u.id}')">${avatar(u,'sm')}<div style="min-width:0"><div>${name(u)} ${sideIco(u)}</div><div>${badge(u)}</div></div></div>`).join('')}
 window.pickCh=async id=>{
   ch=chs.find(c=>c.id==id);if(!ch)return;lastCh[srv.id]=id;closeNav();renderChans();$('#chName').innerHTML=`${icon(ch)} ${esc(ch.name)}`;
   const v=ch.kind=='voice';$('#vcBtn').classList.toggle('hide',!v);$('#vcBtn').textContent=(vch&&vchId==ch.id)?'📴 ออกจากห้อง':'🎤 เข้าห้องเสียง';$('#send').classList.toggle('hide',v||!canPost());
@@ -100,7 +100,7 @@ async function addMsg(m,init){if(document.getElementById('m'+m.id)||(ch&&m.chann
   const f=m.file_url?(/\.(png|jpe?g|gif|webp|avif)$/i.test(m.file_url)?`<img class="msg" loading="lazy" src="${esc(m.file_url)}" onclick="viewImg('${esc(m.file_url)}')">`:`<a class="file" href="${esc(m.file_url)}" target="_blank" rel="noopener">📎 ${esc(m.file_name||'ไฟล์')}</a>`):'';
   const men=m.user_id!=me.id&&((m.content||'').includes('@'+me.alias)||(m.content||'').includes('@everyone'));const stick=!init&&(atBottom()||m.user_id==me.id);
   const el=document.createElement('div');el.className='m'+(men?' me-men':'');el.id='m'+m.id;
-  el.innerHTML=`${avatar(u)}<div class="b">${rp}<span class="nm" onclick="showProfile('${u?.id}')">${name(u)}</span>${badge(u)} <span class="mu">${tm(m.created_at)}</span><div>${fmt(m.content)}</div>${f}<div class="rxs"></div></div>
+  const bot=m.bot_name;el.innerHTML=`${bot?`<div class="av sm bot">${esc(bot[0])}</div>`:avatar(u)}<div class="b">${rp}${bot?`<span class="nm">${esc(bot)}</span><span class="tag bot">BOT</span>`:`<span class="nm" onclick="showProfile('${u?.id}')">${name(u)}</span>${badge(u)}`} <span class="mu">${tm(m.created_at)}</span><div>${fmt(m.content)}</div>${f}<div class="rxs"></div></div>
   <div class="act"><button title="ตอบกลับ" onclick="setReply('${m.id}')">↪</button><button title="รีแอค" onclick="emojiFor('${m.id}')">😀</button>${m.user_id==me.id||rank(me)>=2||isMgr()?`<button title="ลบ" onclick="delMsg('${m.id}')">🗑</button>`:''}</div>`;
   $('#msgs').appendChild(el);drawRx(m.id,m.reactions||[]);if(stick)$('#msgs').scrollTop=1e9}
 function drawRx(id,rs){const g={};rs.forEach(r=>(g[r.emoji]??=[]).push(r.user_id));const el=document.querySelector('#m'+id+' .rxs');if(el)el.innerHTML=Object.entries(g).map(([e,u])=>`<span class="rx ${u.includes(me.id)?'me':''}" onclick="toggleRx('${id}','${e}')">${e} ${u.length}</span>`).join('')}
@@ -162,6 +162,7 @@ window.showProfile=async id=>{
   ${own?`<label>นามแฝง<input id="pa" value="${esc(u.alias)}" maxlength="32"></label><label>ชื่อ (xbox)<input id="px" value="${esc(u.display_name)}" maxlength="32"></label><label>อธิบายโปรไฟล์<textarea id="bio" rows="3" maxlength="500">${esc(u.bio)}</textarea></label><button onclick="saveProfile()">บันทึกโปรไฟล์</button>
   ${u.verified?'':`<h3>ยืนยันตัวตน</h3><p class="mu">ต้องมีช่องสตรีมหรือช่องติดตามที่มีผู้ติดตามอย่างน้อย 200 คน</p><div class="row"><input id="vu" placeholder="ลิงก์ช่อง"><input id="vf" type="number" placeholder="ผู้ติดตาม" style="max-width:130px"><button onclick="reqVerify()">ส่งคำขอ</button></div>`}
   <h3>โพสต์ใหม่</h3><textarea id="pt" rows="2" placeholder="เขียนอะไรสักหน่อย…"></textarea><div class="row"><input type="file" id="pi" accept="image/*"><button onclick="newPost('profile')">โพสต์</button></div>`:`<p>${esc(u.bio)||'<span class="mu">ยังไม่มีคำอธิบาย</span>'}</p>`}
+  ${rank(me)==5?decoPanel(u):''}
   <h3>โพสต์</h3>${(ps||[]).map(p=>postHtml(p,u)).join('')||'<span class="mu">ยังไม่มีโพสต์</span>'}`)};
 window.saveProfile=async()=>{const alias=$('#pa').value.trim(),x=$('#px').value.trim();if(!alias||!x)return toast('กรอกนามแฝงและชื่อ','err');
   try{const d=must(await sb.from('profiles').update({alias,display_name:x,xbox_name:x,bio:$('#bio').value}).eq('id',me.id).select());me=d[0];P[me.id]=me;renderMe();srv&&loadMembers();toast('บันทึกแล้ว','ok')}catch(e){toast('บันทึกไม่ได้: '+e.message,'err')}};
@@ -194,10 +195,11 @@ window.srvAdmin=()=>{if(!isMgr())return openModal(`<h3>${esc(srv.name)}</h3><but
   const mo=members.map(u=>`<option value="${u.id}">${dn(u)}</option>`).join(''),ro=roles.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
   openModal(`<h3>ตั้งค่าชุมชน</h3><label>ชื่อชุมชน<input id="sn" value="${esc(srv.name)}" maxlength="40"></label><label>เปลี่ยนไอคอน<input type="file" id="si" accept="image/*"></label><button onclick="saveSrv()">บันทึก</button>
   <h3>สร้างห้อง</h3><div class="row"><input id="cn" placeholder="ชื่อห้อง"><select id="ck"><option value="text">ข้อความ</option><option value="voice">เสียง</option><option value="announce">ประกาศ</option></select><button onclick="addCh()">เพิ่ม</button></div>
-  <h3>ยศในชุมชน</h3>${roles.map(r=>`<div class="row"><span class="tag" style="background:${/^#[0-9a-f]{6}$/i.test(r.color)?r.color:'#5865f2'}">${esc(r.name)}</span><span class="sp"></span><button class="d" onclick="delRole('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มียศ</span>'}
+  <h3>ยศในชุมชน</h3>${roles.map(r=>`<div class="row"><span class="tag" style="background:${/^#[0-9a-f]{6}$/i.test(r.color)?r.color:'#5865f2'}">${esc(r.name)}</span><span class="sp"></span><button class="g" onclick="roleEditor('${r.id}')">ตั้งค่า</button><button class="d" onclick="delRole('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มียศ</span>'}
   <div class="row"><input id="rn" placeholder="ชื่อยศ"><input id="rc" type="color" value="#7c5cff"><button onclick="addRole()">สร้างยศ</button></div>
   <div class="row"><select id="ru">${mo}</select><select id="rr">${ro}</select><button onclick="giveRole(1)">มอบ</button><button class="g" onclick="giveRole(0)">ถอน</button></div>
-  ${srv.owner==me.id||rank(me)==5?'<h3>โซนอันตราย</h3><button class="d" onclick="delSrv()">ลบชุมชนนี้ทั้งหมด</button>':'<button class="d" onclick="leaveSrv()">ออกจากชุมชน</button>'}`)};
+  <h3>บอทของชุมชน</h3><p class="mu">โค้ดบอทรันในเบราว์เซอร์ของ CEO/เจ้าของชุมชนขณะเปิดเว็บ — ตั้งได้หลายระบบต่อหนึ่งบอท</p><div id="botsBox"></div><button onclick="botEditor()">＋ สร้างบอท</button>
+  ${srv.owner==me.id||rank(me)==5?'<h3>โซนอันตราย</h3><button class="d" onclick="delSrv()">ลบชุมชนนี้ทั้งหมด</button>':'<button class="d" onclick="leaveSrv()">ออกจากชุมชน</button>'}`);loadBotsBox()};
 const reSrv=async()=>{const id=srv.id;await loadServers(id);srvAdmin()};
 window.saveSrv=async()=>{const n=$('#sn').value.trim();if(!n)return toast('ใส่ชื่อ','err');try{const f=$('#si').files[0],p={name:n};if(f)p.icon_url=await upload(await shrink(f,256));must(await sb.from('servers').update(p).eq('id',srv.id).select());toast('บันทึกแล้ว','ok');await reSrv()}catch(x){toast(x.message,'err')}};
 window.addCh=async()=>{const n=$('#cn').value.trim().toLowerCase().replace(/\s+/g,'-');if(!n)return toast('ใส่ชื่อห้อง','err');const r=await sb.from('channels').insert({server_id:srv.id,name:n,kind:$('#ck').value});if(r.error)return toast(r.error.message,'err');toast('เพิ่มห้องแล้ว','ok');await pickSrv(srv.id);srvAdmin()};
