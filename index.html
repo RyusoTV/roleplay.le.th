@@ -1,22 +1,33 @@
 <!doctype html><html lang="th"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>RolePlay Civitas</title><link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090b13">
+<title>RolePlay Civitas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script></head><body>
-<div id="splash"><div class="logo">RolePlay<br>Civitas</div><div class="bar"><i id="bar"></i></div><small id="pct">0%</small></div>
-<div id="auth" class="hide"><div class="card"><h1>RolePlay Civitas</h1>
- <div class="tabs"><button id="tL" class="on">เข้าสู่ระบบ</button><button id="tR">สมัครสมาชิก</button></div>
- <form id="fR" class="hide"><input name="display_name" placeholder="ชื่อ (xbox)" required><input name="age" placeholder="อายุ (oc)" required><input name="alias" placeholder="นามแฝง" required>
-  <input name="email" type="email" placeholder="อีเมล" required><input name="password" type="password" minlength="6" placeholder="รหัสผ่าน" required><button>ขอรหัส OTP</button></form>
- <form id="fL"><input name="email" type="email" placeholder="อีเมล" required><input name="password" type="password" placeholder="รหัสผ่าน" required><button>ขอรหัส OTP</button></form>
- <form id="fO" class="hide"><p id="otpMsg"></p><input name="token" inputmode="numeric" placeholder="รหัส OTP จากอีเมล" required><button>ยืนยัน</button><button type="button" id="rs" style="background:var(--bg);color:var(--tx)">ส่งรหัสใหม่</button></form>
- <p id="err" class="err"></p><p><a href="#" onclick="setupCfg();return false" style="color:var(--mu);font-size:13px">⚙ ตั้งค่าการเชื่อมต่อ Supabase</a></p></div></div>
+<div id="bgfx"><i></i><i></i><i></i></div>
+<div id="splash"><div class="lg pulse">◈</div><div class="logo">RolePlay <b>Civitas</b></div><div class="bar"><i id="bar"></i></div><small id="pct">0%</small></div>
+<div id="auth" class="hide"><div class="card">
+ <div class="brand"><div class="lg">◈</div><h1>RolePlay <b>Civitas</b></h1><p>ชุมชนโรลเพลย์ของคุณ</p></div>
+ <div class="tabs" id="tabs" data-t="L"><i></i><button id="tL" type="button">เข้าสู่ระบบ</button><button id="tR" type="button">สมัครสมาชิก</button></div>
+ <form id="fL"><label>อีเมล<input name="email" type="email" autocomplete="username" required></label><label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password" required></label><button>เข้าสู่ระบบ</button></form>
+ <form id="fR" class="hide"><label>ชื่อ (xbox)<input name="display_name" required maxlength="32"></label><label>อายุ (oc)<input name="age" required maxlength="12"></label><label>นามแฝง<input name="alias" required maxlength="32"></label>
+  <label>อีเมล<input name="email" type="email" autocomplete="username" required></label><label>รหัสผ่าน (อย่างน้อย 6 ตัว)<input name="password" type="password" minlength="6" autocomplete="new-password" required></label><button>สมัครสมาชิก</button></form>
+ <p id="err"></p><a href="#" class="cfg" onclick="setupCfg();return false">⚙ ตั้งค่าการเชื่อมต่อ Supabase</a></div></div>
 <div id="app" class="hide">
  <nav id="rail"></nav>
  <aside id="side"><header id="srvName"></header><div id="chans"></div><div id="me"></div></aside>
- <main><header id="top"><button id="menu">☰</button><b id="chName"></b><span class="sp"></span><button id="vcBtn" class="hide">🎤 เข้าห้องเสียง</button><button id="mute" class="hide">🔇 ปิดไมค์</button><button id="scr" class="hide">🖥 แชร์จอ</button><button id="memBtn">👥</button></header>
-  <div id="msgs"></div><div id="reply" class="hide"></div>
-  <form id="send"><label class="ic">＋<input type="file" id="file" hidden></label><input id="txt" placeholder="ส่งข้อความ... (@ชื่อ เพื่อแท็ก)" autocomplete="off"><button>ส่ง</button></form>
-  <div id="vc" class="hide"></div></main>
- <aside id="mem" class="hide"></aside></div>
-<div id="modal" class="hide"><div class="box"><button class="x" onclick="modal.classList.add('hide')">✕</button><div id="mbody"></div></div></div>
+ <main>
+  <section id="homeView" class="hide"></section>
+  <section id="chatView">
+   <header id="top"><button class="ib" id="menu">☰</button><b id="chName"></b><span class="sp"></span><button id="vcBtn" class="hide">🎤 เข้าห้องเสียง</button><button class="g hide" id="mute">🔇 ปิดไมค์</button><button class="g hide" id="scr">🖥 แชร์จอ</button><button class="ib" id="memBtn">👥</button></header>
+   <div id="vc" class="hide"></div><div id="msgs"></div><div id="reply" class="hide"></div><div id="chip" class="hide"></div><div id="mpop" class="hide"></div>
+   <form id="send"><label class="ib" title="แนบรูป/ไฟล์">📎<input type="file" id="file" hidden></label><input id="txt" placeholder="ส่งข้อความ…  (@ แท็กคน, วางรูปหรือลากไฟล์มาวางได้)" autocomplete="off" maxlength="4000"><button class="ib" type="button" id="emo">😀</button><button class="go">ส่ง</button></form>
+  </section>
+ </main>
+ <aside id="mem"></aside>
+</div>
+<div id="scrim" class="hide"></div>
+<div id="modal" class="hide"><div class="box"><button class="x ib" id="mx">✕</button><div id="mbody"></div></div></div>
+<div id="toasts"></div>
 <script src="config.js"></script><script src="app.js"></script></body></html>
