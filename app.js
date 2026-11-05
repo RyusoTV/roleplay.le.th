@@ -18,14 +18,14 @@ let me,srv,ch,srvs=[],allSrv=[],chs=[],members=[],roles=[],mroles=[],P={},MC={},
 const rank=u=>RANK[u?.status]||1,isMgr=()=>!!srv&&(srv.owner==me.id||rank(me)==5),canPost=()=>ch&&(ch.kind!='announce'||rank(me)>=2||isMgr());
 const roleOf=id=>mroles.filter(m=>m.user_id==id).map(m=>roles.find(r=>r.id==m.role_id)).filter(Boolean);
 const dn=u=>esc(u?.alias||u?.display_name||'?'),colr=u=>/^#[0-9a-f]{6}$/i.test(roleOf(u?.id)[0]?.color||'')?roleOf(u.id)[0].color:'';
-const name=u=>{const d=deco(u),st=d.g1&&d.g2?`background:linear-gradient(90deg,${d.g1},${d.g2});-webkit-background-clip:text;background-clip:text;color:transparent`:d.color?`color:${d.color}`:'';return `${icoHtml(d.front,'dico')}<span style="${st}">${dn(u)}</span> <span class="xb">(${esc(u?.display_name)})</span>`};
+const name=u=>nameHtml(u);
 const avatar=(u,c='')=>`<div class="av ${c} ${online.has(u?.id)?'on':''}" ${u?.avatar_url?`style="background-image:url('${esc(u.avatar_url)}')"`:''} onclick="showProfile('${u?.id}')">${u?.avatar_url?'':esc((u?.alias||'?')[0].toUpperCase())}</div>`;
 const badge=u=>`${u?.verified?'<span class="ver" title="ยืนยันตัวตน">✔</span>':''}${rank(u)>1?`<span class="tag">${LABEL[u.status]}</span>`:''}`;
 const tm=d=>{const x=new Date(d),t=x.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});return x.toDateString()==new Date().toDateString()?t:x.toLocaleDateString('th-TH',{day:'numeric',month:'short'})+' '+t};
 async function user(id,fresh){if(fresh||!P[id]){const {data}=await sb.from('profiles').select('*').eq('id',id).maybeSingle();if(data)P[id]=data}return P[id]}
 const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function buildMention(){const n=['everyone',...members.map(u=>u.alias).filter(Boolean)].map(esc).sort((a,b)=>b.length-a.length);mentionRe=new RegExp('@('+n.map(escRe).join('|')+')','g')}
-const fmt=t=>{let s=esc(t).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');if(mentionRe)s=s.replace(mentionRe,'<span class="men">@$1</span>');return s.replace(/\n/g,'<br>')};
+const fmt=t=>{let s=esc(t).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');s=emoField(s);if(mentionRe)s=s.replace(mentionRe,'<span class="men">@$1</span>');return s.replace(/\n/g,'<br>')};
 function openModal(h){$('#mbody').innerHTML=h;$('#modal').classList.remove('hide')}
 const closeModal=()=>$('#modal').classList.add('hide');$('#mx').onclick=closeModal;$('#modal').onmousedown=e=>{if(e.target.id=='modal')closeModal()};
 const closeNav=()=>{$('#app').classList.remove('nav','memo');$('#scrim').classList.add('hide')};
@@ -72,12 +72,10 @@ window.pickSrv=async id=>{
   if(srv?.id!=id)return;chs=(c.data||[]).sort((a,b)=>(a.kind=='voice')-(b.kind=='voice')||a.name.localeCompare(b.name));roles=r.data||[];mroles=mr.data||[];
   await loadMembers();renderChans();const f=chs.find(x=>x.id==lastCh[id])||chs.find(x=>x.kind!='voice')||chs[0];f?pickCh(f.id):($('#msgs').innerHTML='<div class="empty">🪐<h3>ยังไม่มีห้อง</h3></div>')};
 const icon=c=>c.kind=='voice'?'🔊':c.kind=='announce'?'📢':'#';
-function renderChans(){const t=chs.filter(c=>c.kind!='voice'),v=chs.filter(c=>c.kind=='voice'),row=c=>`<div class="ch ${ch?.id==c.id?'on':''}" data-id="${c.id}" onclick="pickCh('${c.id}')"><span>${icon(c)}</span><span>${esc(c.name)}</span>${isMgr()?`<button class="del" title="ลบห้อง" onclick="event.stopPropagation();delCh('${c.id}')">✕</button>`:''}</div>`;
-  $('#chans').innerHTML=(t.length?'<div class="cat">ห้องข้อความ</div>'+t.map(row).join(''):'')+(v.length?'<div class="cat">ห้องเสียง</div>'+v.map(row).join(''):'')}
+function renderChans(){renderChanList()}
 async function loadMembers(){const {data}=await sb.from('members').select('user_id').eq('server_id',srv.id);const ids=(data||[]).map(x=>x.user_id);
-  const {data:us}=ids.length?await sb.from('profiles').select('*').in('id',ids):{data:[]};members=us||[];members.forEach(u=>P[u.id]=u);buildMention();renderMembers()}
-function renderMembers(){const s=[...members].sort((a,b)=>(online.has(b.id)-online.has(a.id))||(rank(b)-rank(a)));const n=s.filter(u=>online.has(u.id)).length;
-  $('#mem').innerHTML=`<div class="cat">ออนไลน์ ${n} · ทั้งหมด ${s.length}</div>`+s.map(u=>`<div class="u ${online.has(u.id)?'':'off'}" onclick="showProfile('${u.id}')">${avatar(u,'sm')}<div style="min-width:0"><div>${name(u)} ${sideIco(u)}</div><div>${badge(u)}</div></div></div>`).join('')}
+  const {data:us}=ids.length?await sb.from('profiles').select('*').in('id',ids):{data:[]};members=us||[];members.forEach(u=>P[u.id]=u);buildMention();await loadExtras();renderMembers();renderChans()}
+function renderMembers(){renderMemberList()}
 window.pickCh=async id=>{
   ch=chs.find(c=>c.id==id);if(!ch)return;lastCh[srv.id]=id;closeNav();renderChans();$('#chName').innerHTML=`${icon(ch)} ${esc(ch.name)}`;
   const v=ch.kind=='voice';$('#vcBtn').classList.toggle('hide',!v);$('#vcBtn').textContent=(vch&&vchId==ch.id)?'📴 ออกจากห้อง':'🎤 เข้าห้องเสียง';$('#send').classList.toggle('hide',v||!canPost());
@@ -100,7 +98,7 @@ async function addMsg(m,init){if(document.getElementById('m'+m.id)||(ch&&m.chann
   const f=m.file_url?(/\.(png|jpe?g|gif|webp|avif)$/i.test(m.file_url)?`<img class="msg" loading="lazy" src="${esc(m.file_url)}" onclick="viewImg('${esc(m.file_url)}')">`:`<a class="file" href="${esc(m.file_url)}" target="_blank" rel="noopener">📎 ${esc(m.file_name||'ไฟล์')}</a>`):'';
   const men=m.user_id!=me.id&&((m.content||'').includes('@'+me.alias)||(m.content||'').includes('@everyone'));const stick=!init&&(atBottom()||m.user_id==me.id);
   const el=document.createElement('div');el.className='m'+(men?' me-men':'');el.id='m'+m.id;
-  const bot=m.bot_name;el.innerHTML=`${bot?`<div class="av sm bot">${esc(bot[0])}</div>`:avatar(u)}<div class="b">${rp}${bot?`<span class="nm">${esc(bot)}</span><span class="tag bot">BOT</span>`:`<span class="nm" onclick="showProfile('${u?.id}')">${name(u)}</span>${badge(u)}`} <span class="mu">${tm(m.created_at)}</span><div>${fmt(m.content)}</div>${f}<div class="rxs"></div></div>
+  const bot=m.bot_name;el.innerHTML=`${bot?botAv(bot,'sm'):avatar(u)}<div class="b">${rp}${bot?`<span class="nm" style="cursor:pointer" onclick="showBotProfileByName(this.dataset.n)" data-n="${esc(bot)}">${esc(bot)}</span><span class="tag bot">BOT</span>`:`<span class="nm" onclick="showProfile('${u?.id}')">${name(u)}</span>${badge(u)}`} <span class="mu">${tm(m.created_at)}</span><div>${fmt(m.content)}</div>${f}<div class="rxs"></div></div>
   <div class="act"><button title="ตอบกลับ" onclick="setReply('${m.id}')">↪</button><button title="รีแอค" onclick="emojiFor('${m.id}')">😀</button>${m.user_id==me.id||rank(me)>=2||isMgr()?`<button title="ลบ" onclick="delMsg('${m.id}')">🗑</button>`:''}</div>`;
   $('#msgs').appendChild(el);drawRx(m.id,m.reactions||[]);if(stick)$('#msgs').scrollTop=1e9}
 function drawRx(id,rs){const g={};rs.forEach(r=>(g[r.emoji]??=[]).push(r.user_id));const el=document.querySelector('#m'+id+' .rxs');if(el)el.innerHTML=Object.entries(g).map(([e,u])=>`<span class="rx ${u.includes(me.id)?'me':''}" onclick="toggleRx('${id}','${e}')">${e} ${u.length}</span>`).join('')}
@@ -108,7 +106,7 @@ window.toggleRx=async(id,e)=>{closeModal();const {data}=await sb.from('reactions
   const r=has?await sb.from('reactions').delete().match({message_id:id,user_id:me.id,emoji:e}):await sb.from('reactions').insert({message_id:id,user_id:me.id,emoji:e});if(r.error)return toast(r.error.message,'err');
   const {data:d2}=await sb.from('reactions').select('*').eq('message_id',id);drawRx(id,d2||[])};
 window.emojiFor=id=>openModal(`<h3>รีแอค</h3><div class="grid">${EMO.map(e=>`<button onclick="toggleRx('${id}','${e}')">${e}</button>`).join('')}</div>`);
-$('#emo').onclick=()=>openModal(`<h3>อีโมจิ</h3><div class="grid">${EMO.map(e=>`<button onclick="insEmo('${e}')">${e}</button>`).join('')}</div>`);window.insEmo=e=>{$('#txt').value+=e;closeModal();$('#txt').focus()};
+$('#emo').onclick=emoPicker;window.insEmo=e=>{$('#txt').value+=e;closeModal();$('#txt').focus()};
 window.delMsg=async id=>{try{must(await sb.from('messages').delete().eq('id',id).select());document.getElementById('m'+id)?.remove()}catch(x){toast('ลบไม่ได้: '+x.message,'err')}};
 window.setReply=id=>{replyTo=id;const m=MC[id];$('#reply').classList.remove('hide');$('#reply').innerHTML=`<span style="flex:1">↪ ตอบกลับ ${dn(P[m?.user_id])}: ${esc((m?.content||m?.file_name||'').slice(0,60))}</span><button class="ib" type="button" onclick="replyTo=null;$('#reply').classList.add('hide')">✕</button>`;$('#txt').focus()};
 window.setPend=f=>{pend=f;const c=$('#chip');if(!f){c.classList.add('hide');return}c.classList.remove('hide');c.innerHTML=`${f.type.startsWith('image/')?`<img src="${URL.createObjectURL(f)}">`:'📎'}<span>${esc(f.name)}</span><button class="ib" type="button" onclick="setPend(null)">✕</button>`};
@@ -125,32 +123,53 @@ $('#send').onsubmit=async e=>{e.preventDefault();if(!ch||ch.kind=='voice')return
    const {data,error}=await sb.from('messages').insert(row).select().single();if(error)throw error;
    $('#txt').value='';setPend(null);replyTo=null;$('#reply').classList.add('hide');$('#mpop').classList.add('hide');await addMsg({...data,reactions:[]})}
   catch(x){toast('ส่งไม่สำเร็จ: '+x.message,'err')}finally{btn.disabled=false}};
-// ---------- Voice (WebRTC mesh, perfect negotiation) — ไม่จำกัดจำนวนคน ----------
-let vch,vchId,peers={},mic,screen;const ICE={iceServers:C.ICE||[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
-function vcCount(){const ids=[me.id,...Object.keys(peers)];$('#vcInfo')&&($('#vcInfo').innerHTML=`🔊 ในห้อง ${ids.length} คน `+ids.map(i=>`<span class="chipu">${dn(P[i])}</span>`).join(''))}
-$('#vcBtn').onclick=async()=>{if(vch&&vchId==ch.id)return leave();if(vch)leave();await joinVoice()};
+// ---------- Voice (WebRTC mesh, perfect negotiation) — ห้องพูดคุยแบบกริดผู้เข้าร่วม + แถบควบคุม ----------
+let vch,vchId,peers={},mic,screen,selfV=null;const ICE={iceServers:C.ICE||[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+const micOn=()=>!!mic&&mic.getAudioTracks()[0]?.enabled!==false;
+function renderStage(){
+  const box=$('#vc');if(!box)return;
+  if(!vchId){box.innerHTML='';box.classList.add('hide');return}
+  box.classList.remove('hide');
+  const ids=[me.id,...Object.keys(peers)];
+  box.innerHTML=`<div class="stage">${ids.map(id=>`<div class="tile" data-id="${id}"><div class="tv"></div><div class="tcenter">${avatar(P[id]||me,'xl')}</div><div class="tn">${dn(P[id]||me)}${id==me.id&&!micOn()?' 🔇':''}</div></div>`).join('')}</div>
+  <div class="vbar"><button class="vb ${micOn()?'':'off'}" title="ไมค์" onclick="vcMute()">${micOn()?'🎙':'🔇'}</button><button class="vb ${screen?'on':''}" title="แชร์หน้าจอ" onclick="vcScreen()">🖥</button><button class="vb" title="กิจกรรม" onclick="activitiesModal()">🎮</button><button class="vb end" title="ออกจากห้อง" onclick="leave()">📞</button></div><div id="vcMedia" class="hide"></div>`;
+  const media=box.querySelector('#vcMedia');
+  ids.forEach(id=>{const tile=box.querySelector(`.tile[data-id="${id}"]`);if(!tile)return;const tv=tile.querySelector('.tv');
+    const els=id==me.id?(selfV?[selfV]:[]):Object.values(peers[id].els);
+    els.forEach(el=>{if(el.dataset.v=='1'){tv.appendChild(el);tile.classList.add('hasv')}else media.appendChild(el)})});
+}
 async function joinVoice(){
   try{mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch{return toast('ต้องอนุญาตไมค์ และเปิดเว็บผ่าน https','err')}
-  vchId=ch.id;$('#vcBtn').textContent='📴 ออกจากห้อง';['#scr','#mute'].forEach(s=>$(s).classList.remove('hide'));$('#vc').classList.remove('hide');$('#vc').innerHTML='<div id="vcInfo"></div>';vcCount();
+  vchId=ch.id;$('#vcBtn').textContent='📴 ออกจากห้อง';renderStage();
   vch=sb.channel('voice:'+vchId,{config:{presence:{key:me.id},broadcast:{self:false}}});
-  vch.on('broadcast',{event:'sig'},({payload:p})=>{if(p.to==me.id)onSig(p)}).on('presence',{event:'join'},({key})=>{if(key!=me.id){user(key).then(vcCount);pc(key)}}).on('presence',{event:'leave'},({key})=>drop(key))
+  vch.on('broadcast',{event:'sig'},({payload:p})=>{if(p.to==me.id)onSig(p)})
+   .on('presence',{event:'join'},({key})=>{if(key!=me.id)pc(key)})
+   .on('presence',{event:'leave'},({key})=>drop(key))
    .subscribe(s=>{if(s=='SUBSCRIBED')vch.track({u:me.id})})}
 const sig=(to,x)=>vch&&vch.send({type:'broadcast',event:'sig',payload:{to,from:me.id,...x}});
-function pc(id){if(peers[id])return peers[id].p;const p=new RTCPeerConnection(ICE),st={p,polite:me.id<id,making:false,ignore:false,els:[]};peers[id]=st;vcCount();
-  mic.getTracks().forEach(t=>p.addTrack(t,mic));if(screen)screen.getTracks().forEach(t=>p.addTrack(t,screen));
+function mediaEl(st,s){let el=st.els[s.id];if(!el){el=document.createElement('video');el.autoplay=true;el.playsInline=true;el.srcObject=s;st.els[s.id]=el}el.dataset.v=s.getVideoTracks().length?'1':'0';return el}
+function pc(id){if(peers[id])return peers[id].p;
+  const p=new RTCPeerConnection(ICE),st={p,polite:me.id<id,making:false,ignore:false,els:{}};peers[id]=st;
+  user(id).then(()=>renderStage());renderStage();
+  if(mic)mic.getTracks().forEach(t=>p.addTrack(t,mic));if(screen)screen.getTracks().forEach(t=>p.addTrack(t,screen));
   p.onicecandidate=e=>e.candidate&&sig(id,{c:e.candidate});
-  p.ontrack=e=>{const s=e.streams[0];if(!s)return;let v=document.getElementById('s'+s.id);if(!v){v=document.createElement('video');v.id='s'+s.id;v.autoplay=true;v.playsInline=true;v.srcObject=s;$('#vc').appendChild(v);st.els.push(v);s.onremovetrack=()=>{if(!s.getTracks().length)v.remove()}}v.style.display=s.getVideoTracks().length?'':'none';v.play?.().catch(()=>{})};
+  p.ontrack=e=>{const s=e.streams[0];if(!s)return;mediaEl(st,s);
+    s.onremovetrack=()=>{if(!s.getTracks().length){delete st.els[s.id]}renderStage()};renderStage()};
   p.onnegotiationneeded=async()=>{try{st.making=true;await p.setLocalDescription();sig(id,{d:p.localDescription})}catch(e){console.warn(e)}finally{st.making=false}};
   p.onconnectionstatechange=()=>{if(p.connectionState=='failed')p.restartIce()};return p}
 async function onSig(m){pc(m.from);const s=peers[m.from],p=s.p;
   try{if(m.d){const col=m.d.type=='offer'&&(s.making||p.signalingState!='stable');s.ignore=!s.polite&&col;if(s.ignore)return;await p.setRemoteDescription(m.d);if(m.d.type=='offer'){await p.setLocalDescription();sig(m.from,{d:p.localDescription})}}
    else if(m.c){try{await p.addIceCandidate(m.c)}catch(e){if(!s.ignore)throw e}}}catch(e){console.warn(e)}}
-function drop(id){const s=peers[id];if(!s)return;s.p.close();s.els.forEach(v=>v.remove());delete peers[id];vch&&vcCount()}
-function leave(){stopScreen();Object.keys(peers).forEach(drop);mic?.getTracks().forEach(t=>t.stop());vch&&sb.removeChannel(vch);vch=null;vchId=null;$('#vc').innerHTML='';$('#vc').classList.add('hide');['#scr','#mute'].forEach(s=>$(s).classList.add('hide'));$('#vcBtn').textContent='🎤 เข้าห้องเสียง'}
-$('#mute').onclick=()=>{const t=mic?.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;$('#mute').textContent=t.enabled?'🔇 ปิดไมค์':'🎙 เปิดไมค์'};
-function stopScreen(){if(!screen)return;const tr=screen.getTracks();tr.forEach(t=>t.stop());Object.values(peers).forEach(st=>st.p.getSenders().filter(s=>s.track&&tr.includes(s.track)).forEach(s=>st.p.removeTrack(s)));screen=null;$('#scr').textContent='🖥 แชร์จอ'}
-$('#scr').onclick=async()=>{if(screen)return stopScreen();try{screen=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true})}catch{return toast('แชร์หน้าจอไม่ได้ (บางเบราว์เซอร์บนมือถือไม่รองรับ)','err')}
-  screen.getVideoTracks()[0].onended=stopScreen;Object.values(peers).forEach(st=>screen.getTracks().forEach(t=>st.p.addTrack(t,screen)));$('#scr').textContent='⏹ หยุดแชร์'};
+function drop(id){const s=peers[id];if(!s)return;s.p.close();Object.values(s.els).forEach(v=>v.remove());delete peers[id];renderStage()}
+function stopScreen(){if(!screen)return;const tr=screen.getTracks();tr.forEach(t=>t.stop());Object.values(peers).forEach(st=>st.p.getSenders().filter(s=>s.track&&tr.includes(s.track)).forEach(s=>st.p.removeTrack(s)));screen=null;selfV=null;renderStage()}
+window.vcScreen=async()=>{if(screen)return stopScreen();
+  try{screen=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true})}catch{return toast('แชร์หน้าจอไม่ได้ (บางเบราว์เซอร์บนมือถือไม่รองรับ)','err')}
+  screen.getVideoTracks()[0].onended=stopScreen;
+  selfV=document.createElement('video');selfV.autoplay=true;selfV.muted=true;selfV.playsInline=true;selfV.srcObject=screen;selfV.dataset.v='1';
+  Object.values(peers).forEach(st=>screen.getTracks().forEach(t=>st.p.addTrack(t,screen)));renderStage()};
+window.vcMute=()=>{const t=mic?.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;renderStage()};
+$('#vcBtn').onclick=async()=>{if(vch&&vchId==ch.id)return leave();if(vch)leave();await joinVoice()};
+function leave(){stopScreen();Object.keys(peers).forEach(drop);mic?.getTracks().forEach(t=>t.stop());vch&&sb.removeChannel(vch);vch=null;vchId=null;mic=null;selfV=null;renderStage();$('#vcBtn').textContent='🎤 เข้าห้องเสียง'}
 addEventListener('pagehide',()=>vch&&leave());
 // ---------- Profile ----------
 window.showProfile=async id=>{
@@ -194,15 +213,16 @@ window.joinSrv=async id=>{const r=await sb.from('members').insert({server_id:id,
 window.srvAdmin=()=>{if(!isMgr())return openModal(`<h3>${esc(srv.name)}</h3><button class="d" onclick="leaveSrv()">ออกจากชุมชน</button>`);
   const mo=members.map(u=>`<option value="${u.id}">${dn(u)}</option>`).join(''),ro=roles.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
   openModal(`<h3>ตั้งค่าชุมชน</h3><label>ชื่อชุมชน<input id="sn" value="${esc(srv.name)}" maxlength="40"></label><label>เปลี่ยนไอคอน<input type="file" id="si" accept="image/*"></label><button onclick="saveSrv()">บันทึก</button>
-  <h3>สร้างห้อง</h3><div class="row"><input id="cn" placeholder="ชื่อห้อง"><select id="ck"><option value="text">ข้อความ</option><option value="voice">เสียง</option><option value="announce">ประกาศ</option></select><button onclick="addCh()">เพิ่ม</button></div>
+  <h3>สร้างห้อง</h3><div class="row"><input id="cn" placeholder="ชื่อห้อง"><select id="cc"><option value="">ไม่มีหมวดหมู่</option>${catOpts()}</select><select id="ck"><option value="text">ข้อความ</option><option value="voice">เสียง</option><option value="announce">ประกาศ</option></select><button onclick="addCh()">เพิ่ม</button></div>
   <h3>ยศในชุมชน</h3>${roles.map(r=>`<div class="row"><span class="tag" style="background:${/^#[0-9a-f]{6}$/i.test(r.color)?r.color:'#5865f2'}">${esc(r.name)}</span><span class="sp"></span><button class="g" onclick="roleEditor('${r.id}')">ตั้งค่า</button><button class="d" onclick="delRole('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มียศ</span>'}
   <div class="row"><input id="rn" placeholder="ชื่อยศ"><input id="rc" type="color" value="#7c5cff"><button onclick="addRole()">สร้างยศ</button></div>
   <div class="row"><select id="ru">${mo}</select><select id="rr">${ro}</select><button onclick="giveRole(1)">มอบ</button><button class="g" onclick="giveRole(0)">ถอน</button></div>
+  ${catAdminHtml()}${emoAdminHtml()}${wmAdminHtml()}
   <h3>บอทของชุมชน</h3><p class="mu">โค้ดบอทรันในเบราว์เซอร์ของ CEO/เจ้าของชุมชนขณะเปิดเว็บ — ตั้งได้หลายระบบต่อหนึ่งบอท</p><div id="botsBox"></div><button onclick="botEditor()">＋ สร้างบอท</button>
   ${srv.owner==me.id||rank(me)==5?'<h3>โซนอันตราย</h3><button class="d" onclick="delSrv()">ลบชุมชนนี้ทั้งหมด</button>':'<button class="d" onclick="leaveSrv()">ออกจากชุมชน</button>'}`);loadBotsBox()};
 const reSrv=async()=>{const id=srv.id;await loadServers(id);srvAdmin()};
 window.saveSrv=async()=>{const n=$('#sn').value.trim();if(!n)return toast('ใส่ชื่อ','err');try{const f=$('#si').files[0],p={name:n};if(f)p.icon_url=await upload(await shrink(f,256));must(await sb.from('servers').update(p).eq('id',srv.id).select());toast('บันทึกแล้ว','ok');await reSrv()}catch(x){toast(x.message,'err')}};
-window.addCh=async()=>{const n=$('#cn').value.trim().toLowerCase().replace(/\s+/g,'-');if(!n)return toast('ใส่ชื่อห้อง','err');const r=await sb.from('channels').insert({server_id:srv.id,name:n,kind:$('#ck').value});if(r.error)return toast(r.error.message,'err');toast('เพิ่มห้องแล้ว','ok');await pickSrv(srv.id);srvAdmin()};
+window.addCh=async()=>{const n=$('#cn').value.trim().toLowerCase().replace(/\s+/g,'-');if(!n)return toast('ใส่ชื่อห้อง','err');const r=await sb.from('channels').insert({server_id:srv.id,name:n,kind:$('#ck').value,category_id:$('#cc')?.value||null});if(r.error)return toast(r.error.message,'err');toast('เพิ่มห้องแล้ว','ok');await pickSrv(srv.id);srvAdmin()};
 window.addRole=async()=>{const n=$('#rn').value.trim();if(!n)return toast('ใส่ชื่อยศ','err');const r=await sb.from('roles').insert({server_id:srv.id,name:n,color:$('#rc').value});if(r.error)return toast(r.error.message,'err');await pickSrv(srv.id);srvAdmin()};
 window.delRole=async id=>{const r=await sb.from('roles').delete().eq('id',id);if(r.error)return toast(r.error.message,'err');await pickSrv(srv.id);srvAdmin()};
 window.giveRole=async g=>{const u=$('#ru').value,r=$('#rr').value;if(!u||!r)return toast('เลือกสมาชิกและยศ','err');const x=g?await sb.from('member_roles').upsert({server_id:srv.id,user_id:u,role_id:r}):await sb.from('member_roles').delete().match({user_id:u,role_id:r});if(x.error)return toast(x.error.message,'err');toast(g?'มอบยศแล้ว':'ถอนยศแล้ว','ok');await pickSrv(srv.id);srvAdmin()};
