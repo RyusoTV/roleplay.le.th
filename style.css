@@ -105,3 +105,31 @@ button.mini{padding:2px 8px;font-size:13px}
 .holo{background:linear-gradient(90deg,var(--g1,#7c5cff),var(--g2,#34c3ff),#ff6ec7,#ffe66e,#6effc8,var(--g1,#7c5cff));background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:holo 5s linear infinite}
 @keyframes holo{to{background-position:-300% 0}}
 @media (prefers-reduced-motion:reduce){.holo{animation:none}}
+
+/* ---- v7: ฟอร์แมต, @ยศ, กรอบ/แถบชื่อ, กิจกรรมบนโปรไฟล์, รางวัล, พื้นหลังชุมชน ---- */
+/* ชื่อ/ยศ/แถบชื่อ ต้องอยู่บรรทัดเดียว ตัดด้วย ... ไม่ขึ้นบรรทัดใหม่ */
+.nm,.xb,.tag,.ch span,.cat span,.rgrp span,.plate,.actline,.actag,.men,.mu.actline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:inline-block;vertical-align:middle}
+.u>div:last-child{min-width:0}
+.u>div>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plate{padding:2px 12px;border-radius:999px;background-size:cover;background-position:center;background-color:transparent;max-width:100%}
+.rtag{display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.holobg{background-size:300% 100%;animation:holo 5s linear infinite;background-image:linear-gradient(90deg,var(--g1,#7c5cff),var(--g2,#34c3ff),#ff6ec7,#ffe66e,#6effc8,var(--g1,#7c5cff))}
+.avf{position:relative;display:inline-block;flex:none;line-height:0}
+.avf .fr{position:absolute;left:-18%;top:-18%;width:136%;height:136%;pointer-events:none;z-index:2}
+.actag{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--p3);cursor:pointer;font-size:12px}
+.actline{font-size:11.5px;color:var(--mu)}
+.mission{display:grid;gap:4px;margin-bottom:8px}
+.rwth{width:34px;height:34px;object-fit:contain;border-radius:8px}
+.fhelp{display:grid;gap:8px;font-size:14px}
+.fh{display:block;font-size:1.45em;font-weight:800;line-height:1.25;margin:2px 0}
+.fbig{font-size:1.55em;line-height:1.3;font-weight:700}
+.fsmall{font-size:.78em;opacity:.85}
+.flight{font-weight:300}
+.spoil{background:#1e1f24;color:transparent;border-radius:4px;padding:0 4px;cursor:pointer;user-select:none}
+.spoil.on{background:transparent;color:inherit}
+.fanim{display:inline-block;background:linear-gradient(90deg,#ff6ec7,#ffe66e,#6effc8,#7c5cff,#ff6ec7);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:holo 3s linear infinite;font-weight:600}
+.men{background:#5865f233;color:inherit;border-radius:4px;padding:0 3px}
+.men.rmen{background:transparent;padding:0}
+#srvName.hasbg{background-size:cover;background-position:center;min-height:96px;display:flex;align-items:flex-end;color:#fff;text-shadow:0 1px 4px #000}
+#fmtBtn{font-weight:700;font-size:13px;min-width:38px}
+.cemo{margin:0 1px}

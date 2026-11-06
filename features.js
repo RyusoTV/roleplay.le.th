@@ -24,6 +24,7 @@ async function loadExtras(){
   if(srv?.id!=sid)return;
   srvJoins=j.data||[];
   await Promise.all([...new Set(srvJoins.map(x=>x.user_id))].map(u=>user(u)));
+  await loadRewards();
 }
 const joinsOf=id=>srvJoins.filter(j=>j.activity_id==id);
 const joinedByMe=id=>srvJoins.some(j=>j.activity_id==id&&j.user_id==me.id);
@@ -40,12 +41,12 @@ function deco(u){
   const g1=hx(pick('grad1')),g2=hx(pick('grad2'));
   return{mode,g1,g2,front:pick('front_icon'),side:pick('side_icon'),color:(u?.name_mode=='solid'?(g1||roleColor):roleColor)};
 }
-function nameHtml(u){
+function nameHtml(u,plain){
   const d=deco(u);let st='',cls='';
   if(d.mode=='gradient'&&d.g1&&d.g2)st=`background:linear-gradient(90deg,${d.g1},${d.g2});-webkit-background-clip:text;background-clip:text;color:transparent`;
   else if(d.mode=='holo'){cls='holo';st=`--g1:${d.g1||'#7c5cff'};--g2:${d.g2||'#34c3ff'}`}
   else if(d.color)st=`color:${d.color}`;
-  return `${icoHtml(d.front,'dico')}<span class="${cls}" style="${st}">${dn(u)}</span> <span class="xb">(${esc(u?.display_name)})</span>`;
+  return `${icoHtml(d.front,'dico')}<span class="${cls}" style="${st}">${dn(u)}</span> ${plain?'':`<span class="xb">(${esc(u?.display_name)})</span>`}`;
 }
 const sideIco=u=>{const s=deco(u).side;return s?icoHtml(s,'sico'):''};
 
@@ -103,7 +104,7 @@ window.saveQuickCh=async catId=>{const n=$('#qcn').value.trim().toLowerCase().re
 function actDetail(a){const js=joinsOf(a.id);const names=js.slice(0,8).map(j=>esc(P[j.user_id]?.alias||'?')).join(', ');
   return `<b class="adt">${esc(a.title)}</b><div class="mu">${esc(a.subtitle||'')}</div>${a.description?`<p>${esc(a.description)}</p>`:''}${a.stats?`<div class="mu">${esc(a.stats)}</div>`:''}<div class="mu" style="margin-top:6px">เชื่อมต่ออยู่ ${js.length} คน${names?`: ${names}${js.length>8?' …':''}`:''}</div>`}
 function actsHtml(){const m=isCeo();if(!srvActs.length&&!m)return '';
-  return `<div class="cat cat-h"><span>กิจกรรม — ${srvActs.length}</span><span class="sp"></span>${m?'<button class="ib mini" title="เพิ่มกิจกรรม" onclick="actForm()">＋</button>':''}</div>`+
+  return `<div class="cat cat-h"><span>กิจกรรม — ${srvActs.length}</span><span class="sp"></span><button class="ib mini" title="ภารกิจ" onclick="missionsModal()">🎯</button>${m?'<button class="ib mini" title="เพิ่มกิจกรรม" onclick="actForm()">＋</button>':''}</div>`+
   srvActs.map(a=>`<div class="actc" onmouseenter="actHover(this,'${a.id}')" onmouseleave="actOut()" onclick="openAct('${a.id}')"><div class="actimg">${safeUrl(a.image_url)?`<img src="${esc(a.image_url)}" alt="">`:'🎮'}</div><div class="actt"><b>${esc(a.title)}</b><small>${esc(a.subtitle||'')}</small><small>${esc(a.stats||'')}</small></div><span class="actn" title="เชื่อมต่ออยู่">${joinsOf(a.id).length}</span></div>`).join('')}
 window.actHover=(el,id)=>{const a=actOf(id);if(!a)return;let p=$('#actPop');if(!p){p=document.createElement('div');p.id='actPop';document.body.appendChild(p)}
   const r=el.getBoundingClientRect();p.innerHTML=actDetail(a);p.style.top=Math.max(8,Math.min(r.top,innerHeight-260))+'px';p.style.left=(r.right+10)+'px';p.classList.remove('hide')};
@@ -145,11 +146,11 @@ function renderChanList(){
     h+=`<div class="cat cat-h"><span>${esc(cat.name)}</span><span class="sp"></span>${mg?`<button class="ib mini" title="เพิ่มห้องในหมวดนี้" onclick="quickCh('${cat.id}')">＋</button>`:''}</div>`+sortCh(chs.filter(c=>c.category_id==cat.id)).map(row).join('');
   });
   $('#chans').innerHTML=h||'<div class="mu" style="padding:12px">ยังไม่มีห้อง</div>';
-  applyWm();
+  applyWm();applyBanner();
 }
 
 // ---------- รายชื่อสมาชิก: แยกตามยศ + นับคนออนไลน์ในแต่ละยศ + บอท ----------
-function memRow(u){return `<div class="u ${online.has(u.id)?'':'off'}" onclick="showProfile('${u.id}')">${avatar(u,'sm')}<div style="min-width:0"><div>${nameHtml(u)} ${sideIco(u)}</div><div>${badge(u)}</div></div></div>`}
+function memRow(u){const a=actsOfUser(u.id)[0];return `<div class="u ${online.has(u.id)?'':'off'}" onclick="showProfile('${u.id}')">${avatarHtml(u,'sm')}<div style="min-width:0"><div><span class="plate" ${plateStyle(u)}>${nameHtml(u)}</span> ${sideIco(u)}</div><div>${badge(u)}</div>${a?`<div class="mu actline">🎮 ${esc(a.title)}</div>`:''}</div></div>`}
 function renderMemberList(){const el=$('#mem');if(!el||!srv)return;
   const sorted=[...roles].sort((a,b)=>(b.pos||0)-(a.pos||0));
   const groups=new Map(sorted.map(r=>[r.id,{r,items:[]}]));const others=[];
@@ -159,7 +160,7 @@ function renderMemberList(){const el=$('#mem');if(!el||!srv)return;
   const block=(title,r,items)=>{if(!items.length)return;
     items.sort((a,b)=>(online.has(b.id)-online.has(a.id))||(rank(b)-rank(a)));
     const n=items.filter(u=>online.has(u.id)).length;const col=r?hx(r.color):null;
-    h+=`<div class="cat rgrp">${r?icoHtml(r.front_icon,'dico'):''}<span ${col?`style="color:${col}"`:''}>${esc(title)}</span><span class="rcount">ออนไลน์ ${n} / ${items.length}</span></div>`+items.map(memRow).join('')};
+    h+=`<div class="cat rgrp">${r?icoHtml(r.front_icon,'dico'):''}${r?roleNameHtml(r):`<span>${esc(title)}</span>`}<span class="rcount">ออนไลน์ ${n} / ${items.length}</span></div>`+items.map(memRow).join('')};
   for(const {r,items} of groups.values())block(r.name,r,items);
   block('สมาชิก',null,others);
   if(srvBots.length){const on=srvBots.filter(b=>b.enabled).length;
@@ -299,3 +300,139 @@ window.saveBot=async id=>{const name=$('#bn').value.trim();if(!name)return toast
     toast('บันทึกบอทแล้ว','ok');closeModal();await loadExtras();renderMembers();startBots();srvAdmin()}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err')}};
 window.toggleBot=async(id,on)=>{try{must(await sb.from('bots').update({enabled:on}).eq('id',id).select());await loadExtras();renderMembers();startBots();loadBotsBox()}catch(e){toast(e.message,'err')}};
 window.delBot=async id=>{if(!confirm('ลบบอทนี้?'))return;try{must(await sb.from('bots').delete().eq('id',id).select());toast('ลบบอทแล้ว','ok');await loadExtras();renderMembers();startBots();loadBotsBox()}catch(e){toast(e.message,'err')}};
+
+// ================= v7: ฟอร์แมตข้อความ, @ยศ, สียศทุกที่, กรอบ/แถบชื่อ, กิจกรรมบนโปรไฟล์ =================
+let srvRewards=[],srvMissions=[],srvClaims=[],srvUR=[];
+const roleNameMode=r=>r?.name_mode||'solid';
+// ชื่อยศแบบมีสี: สีปกติ / ไล่สี / โฮโลกราฟิก (อ่านค่าจากยศโดยตรง)
+function roleNameHtml(r,extra=''){const m=roleNameMode(r),g1=hx(r.grad1)||'#7c5cff',g2=hx(r.grad2)||'#34c3ff',c=hx(r.color)||'#5865f2';
+  const st=m=='gradient'?`background:linear-gradient(90deg,${g1},${g2});-webkit-background-clip:text;background-clip:text;color:transparent`:m=='holo'?`--g1:${g1};--g2:${g2}`:`color:${c}`;
+  return `<span class="${m=='holo'?'holo':''}" style="${st}${extra}">${esc(r.name)}</span>`}
+// ป้ายยศ (ใช้ในโปรไฟล์และหัวกลุ่มรายชื่อ)
+function roleTag(r){const m=roleNameMode(r),g1=hx(r.grad1)||'#7c5cff',g2=hx(r.grad2)||'#34c3ff',c=hx(r.color)||'#5865f2';
+  const st=m=='gradient'?`background:linear-gradient(90deg,${g1},${g2})`:m=='holo'?`--g1:${g1};--g2:${g2}`:`background:${c}`;
+  return `<span class="tag rtag ${m=='holo'?'holobg':''}" style="${st}">${esc(r.name)}</span>`}
+const roleChipsHtml=rs=>rs.length?`<div class="row">${rs.map(roleTag).join('')}</div>`:'';
+
+// ไอคอนห้องตามประเภท (CEO ปรับได้)
+function iconFor(c){const m=srv?.icon_map||{};const k=c.kind=='voice'?'voice':c.kind=='announce'?'announce':'text';
+  return m[k]||(k=='voice'?'🔊':k=='announce'?'📢':'#')}
+function iconAdminHtml(){const m=srv?.icon_map||{};
+  return `<h3>ไอคอนห้อง</h3><p class="mu">เปลี่ยนไอคอนของแต่ละประเภทห้องได้ (อีโมจิสั้นๆ)</p>
+  <div class="row"><label style="flex:1">ข้อความ<input id="ic-text" value="${esc(m.text||'')}" maxlength="4" placeholder="#"></label><label style="flex:1">เสียง<input id="ic-voice" value="${esc(m.voice||'')}" maxlength="4" placeholder="🔊"></label><label style="flex:1">ประกาศ<input id="ic-announce" value="${esc(m.announce||'')}" maxlength="4" placeholder="📢"></label></div>
+  <button onclick="saveIcons()">บันทึกไอคอนห้อง</button>`}
+window.saveIcons=async()=>{const v={text:$('#ic-text').value.trim(),voice:$('#ic-voice').value.trim(),announce:$('#ic-announce').value.trim()};
+  for(const k in v){if(!v[k])delete v[k];else if(!okIcon(v[k]))return toast('ไอคอนต้องเป็นอีโมจิสั้นๆ','err')}
+  try{must(await sb.from('servers').update({icon_map:v}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('บันทึกไอคอนแล้ว','ok')}catch(e){toast(e.message,'err')}};
+
+// พื้นหลังชุมชน (แถบด้านบนของแถบห้อง)
+function bannerAdminHtml(){return `<h3>พื้นหลังชุมชน</h3><p class="mu">ภาพหรือ GIF แสดงด้านบนของแถบห้อง</p>
+  <input id="sbu" type="file" accept="image/*"><div class="row"><button onclick="saveSrvBanner()">บันทึกพื้นหลัง</button><button class="g" onclick="clearSrvBanner()">เอาออก</button></div>`}
+window.saveSrvBanner=async()=>{const f=$('#sbu').files[0];if(!f||!f.type.startsWith('image/'))return toast('เลือกไฟล์รูปหรือ GIF','err');
+  try{toast('กำลังอัปโหลด…');const url=await upload(await shrink(f,1920));must(await sb.from('servers').update({banner_url:url}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('บันทึกพื้นหลังแล้ว','ok')}catch(e){toast(e.message,'err')}};
+window.clearSrvBanner=async()=>{try{must(await sb.from('servers').update({banner_url:null}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin()}catch(e){toast(e.message,'err')}};
+function applyBanner(){const sn=$('#srvName');if(!sn)return;const b=safeUrl(srv?.banner_url);
+  sn.classList.toggle('hasbg',!!b);sn.style.backgroundImage=b?`url("${b.replace(/["()\\]/g,'')}")`:''}
+
+// ---------- กรอบโปรไฟล์ / แถบชื่อ ----------
+const rewardUrl=id=>safeUrl(srvRewards.find(r=>r.id==id)?.url);
+function avatarHtml(u,c=''){const url=safeUrl(u?.avatar_url),fr=rewardUrl(u?.equip_frame);
+  const av=`<div class="av ${c} ${online.has(u?.id)?'on':''}" ${url?`style="background-image:url('${esc(url)}')"`:''} onclick="showProfile('${u?.id}')">${url?'':esc((u?.alias||'?')[0].toUpperCase())}</div>`;
+  return fr?`<span class="avf">${av}<img class="fr" src="${esc(fr)}" alt="" loading="lazy"></span>`:av}
+const plateStyle=u=>{const p=rewardUrl(u?.equip_plate);return p?`style="background-image:url('${esc(p)}')"`:''};
+function actsOfUser(id){return srvJoins.filter(j=>j.user_id==id).map(j=>actOf(j.activity_id)).filter(Boolean)}
+function actChipsHtml(id){const as=actsOfUser(id);return as.length?`<div class="row">${as.map(a=>`<span class="tag actag" onclick="openAct('${a.id}')">🎮 ${esc(a.title)}</span>`).join('')}</div>`:''}
+
+// ---------- ฟอร์แมตข้อความ ----------
+// คีย์ลัด: **หนา**  *บาง*  ++ใหญ่++  --เล็ก--  ~~ขีดฆ่า~~  ||ซ่อน||  ^^เคลื่อนไหว^^  # หัวข้อ  [ข้อความ](https://ลิงก์)  `โค้ด`
+function richFmt(t){
+  const codes=[];let s=esc(t).replace(/`([^`\n]+)`/g,(m,c)=>{codes.push(c);return `\u0001${codes.length-1}\u0001`});
+  s=s.replace(/^# (.+)$/gm,'<span class="fh">$1</span>');
+  s=s.replace(/\[([^\]\n]{1,80})\]\((https:\/\/[^\s)<]+)\)/g,(m,a,u)=>`<a href="${u}" target="_blank" rel="noopener noreferrer">${a}</a>`);
+  s=s.replace(/(^|[\s>])(https?:\/\/[^\s<]+)/g,(m,p,u)=>`${p}<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
+  s=s.replace(/\|\|([^|\n]+)\|\|/g,'<span class="spoil" onclick="this.classList.toggle(\'on\')">$1</span>')
+     .replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>')
+     .replace(/~~([^~\n]+)~~/g,'<s>$1</s>')
+     .replace(/\+\+([^+\n]+)\+\+/g,'<span class="fbig">$1</span>')
+     .replace(/--([^-\n]+)--/g,'<span class="fsmall">$1</span>')
+     .replace(/\^\^([^^\n]+)\^\^/g,'<span class="fanim">$1</span>')
+     .replace(/\*([^*\n]+)\*/g,'<span class="flight">$1</span>');
+  s=emoField(s);
+  // @ชื่อ / @ยศ / @everyone — เฉพาะส่วนที่เป็นข้อความ (ไม่แตะแท็ก)
+  const names=new Map([['everyone',null]]);members.forEach(u=>{if(u.alias)names.set(u.alias,u)});roles.forEach(r=>{if(r.name&&!names.has(r.name))names.set(r.name,r)});
+  const keys=[...names.keys()].map(k=>esc(k)).sort((a,b)=>b.length-a.length);
+  if(keys.length){const re=new RegExp('@('+keys.map(escRe).join('|')+')(?![^\\s<])','g');
+    s=s.split(/(<[^>]+>)/).map(part=>part.startsWith('<')?part:part.replace(re,(m,k)=>{const raw=k.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+      const r=roles.find(x=>esc(x.name)==k&&!members.some(u=>esc(u.alias||'')==k));
+      return r?`<span class="men rmen">@${roleNameHtml(r)}</span>`:`<span class="men">@${k}</span>`})).join('')}
+  s=s.replace(/\u0001(\d+)\u0001/g,(m,i)=>`<code>${codes[+i]}</code>`);
+  return s.replace(/\n/g,'<br>')}
+window.fmtHelp=()=>openModal(`<h3>คีย์ลัดจัดข้อความ</h3>
+  <div class="fhelp"><div><code>**หนา**</code></div><div><span class="fbig">++ตัวใหญ่++</span></div><div><span class="fsmall">--ตัวเล็ก--</span></div><div><span class="flight">*ตัวบาง*</span></div><div><s>~~ขีดฆ่า~~</s></div><div><span class="spoil" onclick="this.classList.toggle('on')">||ซ่อนข้อความ||</span> <span class="mu">(คลิกเพื่อดู)</span></div><div><span class="fanim">^^ข้อความเคลื่อนไหว^^</span></div><div><span class="fh"># หัวข้อใหญ่</span> <span class="mu">(ขึ้นต้นบรรทัด)</span></div><div>[ข้อความลิงก์](https://example.com)</div><div><code>&#96;โค้ด&#96;</code></div><div><span class="men">@ชื่อ</span> <span class="men rmen">@ชื่อยศ</span> <span class="men">@everyone</span></div></div>`);
+
+// ---------- รางวัลและภารกิจ ----------
+async function loadRewards(){if(!srv)return;const sid=srv.id;
+  const {data:rw}=await sb.from('rewards').select('*').eq('server_id',sid).order('created_at');
+  if(srv?.id!=sid)return;srvRewards=rw||[];const rids=srvRewards.map(r=>r.id);
+  const [{data:ur},{data:ms}]=await Promise.all([rids.length?sb.from('user_rewards').select('*').in('reward_id',rids):{data:[]},sb.from('missions').select('*').eq('server_id',sid).order('created_at')]);
+  srvUR=ur||[];srvMissions=ms||[];const mids=srvMissions.map(m=>m.id);
+  const {data:cl}=mids.length?await sb.from('mission_claims').select('*').in('mission_id',mids).order('created_at'):{data:[]};
+  srvClaims=cl||[];
+  await Promise.all([...new Set([...srvUR.map(x=>x.user_id),...srvClaims.map(c=>c.user_id)])].map(u=>user(u)));
+}
+function equipHtml(u){
+  const owned=srvUR.filter(x=>x.user_id==u.id).map(x=>srvRewards.find(r=>r.id==x.reward_id)).filter(Boolean);
+  const fr=owned.filter(r=>r.kind=='frame'),pl=owned.filter(r=>r.kind=='plate');
+  if(!owned.length)return u.id==me.id?`<h3>กรอบโปรไฟล์และแถบชื่อ</h3><p class="mu">ทำภารกิจเพื่อรับกรอบโปรไฟล์และแถบชื่อ</p><button onclick="missionsModal()">🎯 ดูภารกิจ</button>`:'';
+  const opt=(list,cur)=>`<option value="">— ไม่ใช้ —</option>`+list.map(r=>`<option value="${r.id}" ${cur==r.id?'selected':''}>${esc(r.name)}</option>`).join('');
+  return `<h3>กรอบโปรไฟล์และแถบชื่อ</h3><div class="row"><label style="flex:1">กรอบ<select id="eqf">${opt(fr,u.equip_frame)}</select></label><label style="flex:1">แถบชื่อ<select id="eqp">${opt(pl,u.equip_plate)}</select></label></div><button onclick="saveEquip('${u.id}')">ใช้รางวัลที่เลือก</button>`}
+window.saveEquip=async id=>{try{must(await sb.from('profiles').update({equip_frame:$('#eqf').value||null,equip_plate:$('#eqp').value||null}).eq('id',id).select());toast('ใช้รางวัลแล้ว','ok');await afterDeco(id)}catch(e){toast(e.message,'err')}};
+
+window.missionsModal=async()=>{if(!srv)return;await loadRewards();
+  const rw=id=>srvRewards.find(r=>r.id==id);
+  const mine=srvClaims.filter(c=>c.user_id==me.id);
+  const latest=mid=>mine.filter(c=>c.mission_id==mid).slice(-1)[0];
+  const missHtml=srvMissions.map(m=>{const c=latest(m.id);const r=rw(m.reward_id);
+    const st=!c?'':c.status=='approved'?'✅ ได้รับรางวัลแล้ว':c.status=='pending'?'⏳ รอตรวจ':'❌ ไม่ผ่าน ส่งใหม่ได้';
+    const canSend=!isCeo()&&(!c||c.status=='rejected');
+    return `<div class="panel mission"><b>${esc(m.title)}</b> <span class="tag">รางวัล: ${esc(r?.name||'—')}</span><p class="mu" style="margin:6px 0">${esc(m.description||'')}</p><div class="row"><span class="mu">${st}</span><span class="sp"></span>${canSend?`<button onclick="submitMission('${m.id}')">ส่งงาน</button>`:''}</div></div>`}).join('')||'<span class="mu">ยังไม่มีภารกิจ</span>';
+  const pend=srvClaims.filter(c=>c.status=='pending');
+  const review=isCeo()?`<h3>ตรวจงาน (${pend.length})</h3>`+(pend.map(c=>{const m=srvMissions.find(x=>x.id==c.mission_id);
+    return `<div class="panel"><b>${esc(P[c.user_id]?.alias||'?')}</b> → ${esc(m?.title||'')}<div class="mu">${c.proof_url?`<a href="${esc(safeUrl(c.proof_url)||'#')}" target="_blank" rel="noopener">ดูหลักฐาน</a>`:''} ${esc(c.note||'')}</div><div class="row"><button onclick="reviewClaim('${c.id}',true)">อนุมัติ + มอบรางวัล</button><button class="d" onclick="reviewClaim('${c.id}',false)">ไม่ผ่าน</button></div></div>`}).join('')||'<span class="mu">ไม่มีงานรอตรวจ</span>')
+    :'';
+  openModal(`<h3>🎯 ภารกิจ</h3>${missHtml}${review}`)};
+window.submitMission=id=>openModal(`<h3>ส่งงานภารกิจ</h3><label>ลิงก์หลักฐาน (https) หรือหมายเหตุ<input id="mpf" maxlength="300"></label><label>รูปหรือ GIF หลักฐาน (ไม่บังคับ)<input type="file" id="mpi" accept="image/*"></label><button onclick="sendClaim('${id}')">ส่งงาน</button>`);
+window.sendClaim=async id=>{const v=$('#mpf').value.trim(),f=$('#mpi').files[0];const link=isUrlIco(v)?v:null;
+  try{const proof=f?await upload(await shrink(f,1600)):link;
+    const r=await sb.from('mission_claims').insert({mission_id:id,user_id:me.id,status:'pending',proof_url:proof||null,note:link?null:(v||null)});if(r.error)throw r.error;
+    toast('ส่งงานแล้ว รอ CEO ตรวจ','ok');await loadRewards();missionsModal()}catch(e){toast('ส่งงานไม่สำเร็จ: '+e.message,'err')}};
+window.reviewClaim=async(id,ok)=>{const c=srvClaims.find(x=>x.id==id);if(!c)return;
+  try{must(await sb.from('mission_claims').update({status:ok?'approved':'rejected'}).eq('id',id).select());
+    if(ok){const m=srvMissions.find(x=>x.id==c.mission_id);if(m?.reward_id){must(await sb.from('user_rewards').upsert({user_id:c.user_id,reward_id:m.reward_id,server_id:srv.id},{onConflict:'user_id,reward_id'}).select())}}
+    toast(ok?'อนุมัติและมอบรางวัลแล้ว':'บันทึกว่าไม่ผ่านแล้ว','ok');await loadRewards();missionsModal()}catch(e){toast(e.message,'err')}};
+
+// หน้าตั้งค่าชุมชน (CEO): สร้างรางวัล ภารกิจ และมอบรางวัลตรงๆ
+function rewardAdminHtml(){
+  const rwList=srvRewards.map(r=>`<div class="row"><img class="rwth" src="${esc(r.url)}" alt=""><b style="flex:1">${esc(r.name)}</b><span class="mu">${r.kind=='frame'?'กรอบ':'แถบชื่อ'}</span><button class="d" onclick="delReward('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มีรางวัล</span>';
+  const msList=srvMissions.map(m=>`<div class="row"><b style="flex:1">${esc(m.title)}</b><button class="d" onclick="delMission('${m.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มีภารกิจ</span>';
+  const rwOpts=srvRewards.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  const memOpts=members.map(u=>`<option value="${u.id}">${esc(u.alias||'?')}</option>`).join('');
+  return `<h3>รางวัลและภารกิจ</h3><p class="mu">รางวัลคือกรอบโปรไฟล์หรือแถบชื่อ (รองรับ GIF) ผู้ใช้ทำภารกิจแล้ว CEO อนุมัติเพื่อรับรางวัล</p>
+  <h4 class="mu" style="margin:6px 0">รางวัล</h4>${rwList}
+  <div class="panel"><label>ชื่อรางวัล<input id="rwn" maxlength="40"></label><div class="row"><label style="flex:1">ประเภท<select id="rwk"><option value="frame">กรอบโปรไฟล์</option><option value="plate">แถบชื่อ</option></select></label><input id="rwu" placeholder="ลิงก์ https (หรืออัปโหลด)" style="flex:2"></div><input id="rwf" type="file" accept="image/*"><button onclick="addReward()">เพิ่มรางวัล</button></div>
+  <h4 class="mu" style="margin:6px 0">ภารกิจ</h4>${msList}
+  <div class="panel"><label>ชื่อภารกิจ<input id="msn" maxlength="60"></label><label>รายละเอียด<input id="msd" maxlength="300"></label><label>รางวัลที่ได้<select id="msr">${rwOpts}</select></label><button onclick="addMission()">เพิ่มภารกิจ</button></div>
+  <h4 class="mu" style="margin:6px 0">มอบรางวัลให้สมาชิกโดยตรง</h4><div class="row"><select id="gu" style="flex:1">${memOpts}</select><select id="gr" style="flex:1">${rwOpts}</select><button onclick="grantReward()">มอบ</button></div>`}
+window.addReward=async()=>{const n=$('#rwn').value.trim(),k=$('#rwk').value,u=$('#rwu').value.trim(),f=$('#rwf').files[0];if(!n)return toast('ใส่ชื่อรางวัล','err');
+  try{let url=u;if(f){toast('กำลังอัปโหลด…');url=await upload(await shrink(f,512))}
+    if(!isUrlIco(url))return toast('ต้องมีรูปหรือลิงก์ https','err');
+    must(await sb.from('rewards').insert({server_id:srv.id,name:n,kind:k,url}).select());toast('เพิ่มรางวัลแล้ว','ok');await loadRewards();srvAdmin()}catch(e){toast(e.message,'err')}};
+window.delReward=async id=>{if(!confirm('ลบรางวัลนี้? ผู้ที่เคยได้รับจะไม่เห็นรางวัลนี้แล้ว'))return;try{must(await sb.from('rewards').delete().eq('id',id).select());await loadRewards();srvAdmin()}catch(e){toast(e.message,'err')}};
+window.addMission=async()=>{const t=$('#msn').value.trim(),d=$('#msd').value.trim(),r=$('#msr').value;if(!t)return toast('ใส่ชื่อภารกิจ','err');
+  try{must(await sb.from('missions').insert({server_id:srv.id,title:t,description:d||null,reward_id:r||null}).select());toast('เพิ่มภารกิจแล้ว','ok');await loadRewards();srvAdmin()}catch(e){toast(e.message,'err')}};
+window.delMission=async id=>{try{must(await sb.from('missions').delete().eq('id',id).select());await loadRewards();srvAdmin()}catch(e){toast(e.message,'err')}};
+window.grantReward=async()=>{const u=$('#gu').value,r=$('#gr').value;if(!u||!r)return toast('เลือกสมาชิกและรางวัล','err');
+  try{must(await sb.from('user_rewards').upsert({user_id:u,reward_id:r,server_id:srv.id},{onConflict:'user_id,reward_id'}).select());toast('มอบรางวัลแล้ว','ok');await loadRewards();srvAdmin()}catch(e){toast(e.message,'err')}};
+
+// ปุ่มคีย์ลัดข้อความที่ช่องพิมพ์ (ใส่ครั้งเดียวหลังโหลดหน้า)
+document.addEventListener('DOMContentLoaded',()=>{const tx=$('#txt');if(tx&&!$('#fmtBtn')){const b=document.createElement('button');b.type='button';b.id='fmtBtn';b.className='ib';b.title='คีย์ลัดจัดข้อความ';b.textContent='Aa';b.onclick=fmtHelp;tx.parentNode.insertBefore(b,tx)}});

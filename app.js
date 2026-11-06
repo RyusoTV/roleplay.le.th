@@ -19,13 +19,13 @@ const rank=u=>RANK[u?.status]||1,isMgr=()=>!!srv&&(srv.owner==me.id||rank(me)==5
 const roleOf=id=>mroles.filter(m=>m.user_id==id).map(m=>roles.find(r=>r.id==m.role_id)).filter(Boolean);
 const dn=u=>esc(u?.alias||u?.display_name||'?'),colr=u=>/^#[0-9a-f]{6}$/i.test(roleOf(u?.id)[0]?.color||'')?roleOf(u.id)[0].color:'';
 const name=u=>nameHtml(u);
-const avatar=(u,c='')=>`<div class="av ${c} ${online.has(u?.id)?'on':''}" ${u?.avatar_url?`style="background-image:url('${esc(u.avatar_url)}')"`:''} onclick="showProfile('${u?.id}')">${u?.avatar_url?'':esc((u?.alias||'?')[0].toUpperCase())}</div>`;
+const avatar=(u,c='')=>avatarHtml(u,c);
 const badge=u=>`${u?.verified?'<span class="ver" title="ยืนยันตัวตน">✔</span>':''}${rank(u)>1?`<span class="tag">${LABEL[u.status]}</span>`:''}`;
 const tm=d=>{const x=new Date(d),t=x.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});return x.toDateString()==new Date().toDateString()?t:x.toLocaleDateString('th-TH',{day:'numeric',month:'short'})+' '+t};
 async function user(id,fresh){if(fresh||!P[id]){const {data}=await sb.from('profiles').select('*').eq('id',id).maybeSingle();if(data)P[id]=data}return P[id]}
 const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function buildMention(){const n=['everyone',...members.map(u=>u.alias).filter(Boolean)].map(esc).sort((a,b)=>b.length-a.length);mentionRe=new RegExp('@('+n.map(escRe).join('|')+')','g')}
-const fmt=t=>{let s=esc(t).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');s=emoField(s);if(mentionRe)s=s.replace(mentionRe,'<span class="men">@$1</span>');return s.replace(/\n/g,'<br>')};
+const fmt=t=>richFmt(t);
 function openModal(h){$('#mbody').innerHTML=h;$('#modal').classList.remove('hide')}
 const closeModal=()=>$('#modal').classList.add('hide');$('#mx').onclick=closeModal;$('#modal').onmousedown=e=>{if(e.target.id=='modal')closeModal()};
 const closeNav=()=>{$('#app').classList.remove('nav','memo');$('#scrim').classList.add('hide')};
@@ -71,7 +71,7 @@ window.pickSrv=async id=>{
   const [c,r,mr]=await Promise.all([sb.from('channels').select('*').eq('server_id',id),sb.from('roles').select('*').eq('server_id',id),sb.from('member_roles').select('*').eq('server_id',id)]);
   if(srv?.id!=id)return;chs=(c.data||[]).sort((a,b)=>(a.kind=='voice')-(b.kind=='voice')||a.name.localeCompare(b.name));roles=r.data||[];mroles=mr.data||[];
   await loadMembers();renderChans();const f=chs.find(x=>x.id==lastCh[id])||chs.find(x=>x.kind!='voice')||chs[0];f?pickCh(f.id):($('#msgs').innerHTML='<div class="empty">🪐<h3>ยังไม่มีห้อง</h3></div>')};
-const icon=c=>c.kind=='voice'?'🔊':c.kind=='announce'?'📢':'#';
+const icon=c=>iconFor(c);
 function renderChans(){renderChanList()}
 async function loadMembers(){const {data}=await sb.from('members').select('user_id').eq('server_id',srv.id);const ids=(data||[]).map(x=>x.user_id);
   const {data:us}=ids.length?await sb.from('profiles').select('*').in('id',ids):{data:[]};members=us||[];members.forEach(u=>P[u.id]=u);buildMention();await loadExtras();renderMembers();renderChans()}
@@ -113,7 +113,7 @@ window.setPend=f=>{pend=f;const c=$('#chip');if(!f){c.classList.add('hide');retu
 $('#file').onchange=e=>{setPend(e.target.files[0]||null);e.target.value=''};
 $('#txt').addEventListener('paste',e=>{const f=e.clipboardData?.files?.[0];if(f){e.preventDefault();setPend(f)}});
 $('#chatView').addEventListener('dragover',e=>e.preventDefault());$('#chatView').addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f&&ch&&canPost())setPend(f)});
-$('#txt').oninput=()=>{const m=/@([^\s@]*)$/.exec($('#txt').value),b=$('#mpop');if(!m)return b.classList.add('hide');const q=m[1].toLowerCase(),l=[{alias:'everyone'},...members].filter(u=>u.alias&&u.alias.toLowerCase().startsWith(q)).slice(0,6);if(!l.length)return b.classList.add('hide');b.innerHTML=l.map(u=>`<div data-a="${esc(u.alias)}">@${esc(u.alias)}</div>`).join('');b.classList.remove('hide')};
+$('#txt').oninput=()=>{const m=/@([^\s@]*)$/.exec($('#txt').value),b=$('#mpop');if(!m)return b.classList.add('hide');const q=m[1].toLowerCase(),l=[{alias:'everyone'},...roles.map(r=>({alias:r.name})),...members].filter(u=>u.alias&&u.alias.toLowerCase().startsWith(q)).slice(0,6);if(!l.length)return b.classList.add('hide');b.innerHTML=l.map(u=>`<div data-a="${esc(u.alias)}">@${esc(u.alias)}</div>`).join('');b.classList.remove('hide')};
 $('#mpop').onclick=e=>{const a=e.target.dataset?.a;if(!a)return;const t=$('#txt');t.value=t.value.replace(/@([^\s@]*)$/,'@'+a+' ');$('#mpop').classList.add('hide');t.focus()};
 const spam=t=>/(.)\1{24,}/.test(t);
 $('#send').onsubmit=async e=>{e.preventDefault();if(!ch||ch.kind=='voice')return;const content=$('#txt').value.trim();if(!content&&!pend)return;if(spam(content))return toast('ข้อความคล้ายสแปม','err');
@@ -176,8 +176,8 @@ window.showProfile=async id=>{
   const u=await user(id,true);if(!u)return toast('ไม่พบผู้ใช้','err');const own=id==me.id,{data:ps}=await sb.from('posts').select('*').eq('user_id',id).order('created_at',{ascending:false}).limit(20);const rs=srv?roleOf(id):[];
   openModal(`<div class="ban" style="${u.banner_url?`background-image:url('${esc(u.banner_url)}')`:''}">${own?`<label class="edit">🖼 เปลี่ยนพื้นหลัง<input type="file" accept="image/*" hidden onchange="setImg('banner_url',this.files[0])"></label>`:''}</div>
   <div class="pfh"><div class="av xl ${online.has(id)?'on':''}" ${u.avatar_url?`style="background-image:url('${esc(u.avatar_url)}')"`:''}>${u.avatar_url?'':esc((u.alias||'?')[0].toUpperCase())}${own?`<label class="cam" title="เปลี่ยนรูปโปรไฟล์">📷<input type="file" accept="image/*" hidden onchange="setImg('avatar_url',this.files[0])"></label>`:''}</div>
-  <div><h3 style="margin:0">${dn(u)} ${badge(u)}</h3><span class="mu">${esc(u.display_name)} (xbox) · อายุ ${esc(u.age)} · ${LABEL[u.status]}</span></div></div>
-  ${rs.length?`<div class="row">${rs.map(r=>`<span class="tag" style="background:${/^#[0-9a-f]{6}$/i.test(r.color)?r.color:'#5865f2'}">${esc(r.name)}</span>`).join('')}</div>`:''}
+  <div><h3 style="margin:0"><span class="plate" ${plateStyle(u)}>${nameHtml(u,true)}</span> ${badge(u)}</h3><span class="mu">${esc(u.display_name)} (xbox) · อายุ ${esc(u.age)} · ${LABEL[u.status]}</span></div></div>
+  ${roleChipsHtml(rs)}${actChipsHtml(id)}${own||rank(me)==5?equipHtml(u):''}
   ${own?`<label>นามแฝง<input id="pa" value="${esc(u.alias)}" maxlength="32"></label><label>ชื่อ (xbox)<input id="px" value="${esc(u.display_name)}" maxlength="32"></label><label>อธิบายโปรไฟล์<textarea id="bio" rows="3" maxlength="500">${esc(u.bio)}</textarea></label><button onclick="saveProfile()">บันทึกโปรไฟล์</button>
   ${u.verified?'':`<h3>ยืนยันตัวตน</h3><p class="mu">ต้องมีช่องสตรีมหรือช่องติดตามที่มีผู้ติดตามอย่างน้อย 200 คน</p><div class="row"><input id="vu" placeholder="ลิงก์ช่อง"><input id="vf" type="number" placeholder="ผู้ติดตาม" style="max-width:130px"><button onclick="reqVerify()">ส่งคำขอ</button></div>`}
   <h3>โพสต์ใหม่</h3><textarea id="pt" rows="2" placeholder="เขียนอะไรสักหน่อย…"></textarea><div class="row"><input type="file" id="pi" accept="image/*"><button onclick="newPost('profile')">โพสต์</button></div>`:`<p>${esc(u.bio)||'<span class="mu">ยังไม่มีคำอธิบาย</span>'}</p>`}
@@ -214,10 +214,10 @@ window.srvAdmin=()=>{if(!isMgr())return openModal(`<h3>${esc(srv.name)}</h3><but
   const mo=members.map(u=>`<option value="${u.id}">${dn(u)}</option>`).join(''),ro=roles.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
   openModal(`<h3>ตั้งค่าชุมชน</h3><label>ชื่อชุมชน<input id="sn" value="${esc(srv.name)}" maxlength="40"></label><label>เปลี่ยนไอคอน<input type="file" id="si" accept="image/*"></label><button onclick="saveSrv()">บันทึก</button>
   <h3>สร้างห้อง</h3><div class="row"><input id="cn" placeholder="ชื่อห้อง"><select id="cc"><option value="">ไม่มีหมวดหมู่</option>${catOpts()}</select><select id="ck"><option value="text">ข้อความ</option><option value="voice">เสียง</option><option value="announce">ประกาศ</option></select><button onclick="addCh()">เพิ่ม</button></div>
-  <h3>ยศในชุมชน</h3>${roles.map(r=>`<div class="row"><span class="tag" style="background:${/^#[0-9a-f]{6}$/i.test(r.color)?r.color:'#5865f2'}">${esc(r.name)}</span><span class="sp"></span><button class="g" onclick="roleEditor('${r.id}')">ตั้งค่า</button><button class="d" onclick="delRole('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มียศ</span>'}
+  <h3>ยศในชุมชน</h3>${roles.map(r=>`<div class="row">${roleTag(r)}<span class="sp"></span><button class="g" onclick="roleEditor('${r.id}')">ตั้งค่า</button><button class="d" onclick="delRole('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มียศ</span>'}
   <div class="row"><input id="rn" placeholder="ชื่อยศ"><input id="rc" type="color" value="#7c5cff"><button onclick="addRole()">สร้างยศ</button></div>
   <div class="row"><select id="ru">${mo}</select><select id="rr">${ro}</select><button onclick="giveRole(1)">มอบ</button><button class="g" onclick="giveRole(0)">ถอน</button></div>
-  ${catAdminHtml()}${emoAdminHtml()}${wmAdminHtml()}
+  ${catAdminHtml()}${iconAdminHtml()}${bannerAdminHtml()}${rewardAdminHtml()}${emoAdminHtml()}${wmAdminHtml()}
   <h3>บอทของชุมชน</h3><p class="mu">โค้ดบอทรันในเบราว์เซอร์ของ CEO/เจ้าของชุมชนขณะเปิดเว็บ — ตั้งได้หลายระบบต่อหนึ่งบอท</p><div id="botsBox"></div><button onclick="botEditor()">＋ สร้างบอท</button>
   ${srv.owner==me.id||rank(me)==5?'<h3>โซนอันตราย</h3><button class="d" onclick="delSrv()">ลบชุมชนนี้ทั้งหมด</button>':'<button class="d" onclick="leaveSrv()">ออกจากชุมชน</button>'}`);loadBotsBox()};
 const reSrv=async()=>{const id=srv.id;await loadServers(id);srvAdmin()};
