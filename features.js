@@ -315,7 +315,7 @@ function roleTag(r){const m=roleNameMode(r),g1=hx(r.grad1)||'#7c5cff',g2=hx(r.gr
 const roleChipsHtml=rs=>rs.length?`<div class="row">${rs.map(roleTag).join('')}</div>`:'';
 
 // ไอคอนห้องตามประเภท (CEO ปรับได้)
-function iconFor(c){const m=srv?.icon_map||{};const k=c.kind=='voice'?'voice':c.kind=='announce'?'announce':'text';
+function iconFor(c){if(c.kind=='donate')return '💖';const m=srv?.icon_map||{};const k=c.kind=='voice'?'voice':c.kind=='announce'?'announce':'text';
   return m[k]||(k=='voice'?'🔊':k=='announce'?'📢':'#')}
 function iconAdminHtml(){const m=srv?.icon_map||{};
   return `<h3>ไอคอนห้อง</h3><p class="mu">เปลี่ยนไอคอนของแต่ละประเภทห้องได้ (อีโมจิสั้นๆ)</p>
@@ -436,3 +436,144 @@ window.grantReward=async()=>{const u=$('#gu').value,r=$('#gr').value;if(!u||!r)r
 
 // ปุ่มคีย์ลัดข้อความที่ช่องพิมพ์ (ใส่ครั้งเดียวหลังโหลดหน้า)
 document.addEventListener('DOMContentLoaded',()=>{const tx=$('#txt');if(tx&&!$('#fmtBtn')){const b=document.createElement('button');b.type='button';b.id='fmtBtn';b.className='ib';b.title='คีย์ลัดจัดข้อความ';b.textContent='Aa';b.onclick=fmtHelp;tx.parentNode.insertBefore(b,tx)}});
+
+/* ===== v8: ธีมชุมชน + ห้องสอบ/เทสโรล + การ์ดประกาศผล ===== */
+function evCeo(){return !!srv&&(srv.owner==me.id||rank(me)==5)}
+function applyTheme(){const r=document.documentElement,t=srv?.theme||{};
+  const hx=v=>/^#[0-9a-f]{6}$/i.test(v||'')?v:null;
+  const a1=hx(t.a1)||'#7c5cff',a2=hx(t.a2)||'#34c3ff';
+  r.style.setProperty('--a1',a1);r.style.setProperty('--a2',a2);r.style.setProperty('--grad',`linear-gradient(135deg,${a1},${a2})`);
+  document.body.dataset.anim=['full','calm','off'].includes(t.anim)?t.anim:'full';
+  const u=safeUrl(t.bg);r.style.setProperty('--tbg',u?`url("${u.replace(/["()\\]/g,'')}")`:'none')}
+const _rclBase=renderChanList;
+renderChanList=function(){_rclBase();applyTheme();evTop();codeTop()};
+const _iconForBase=iconFor;
+iconFor=function(c){return c.eval_mode?'🎓':_iconForBase(c)};
+
+function themeAdminHtml(){if(!evCeo())return '';const t=srv?.theme||{};
+  const sel=(v)=>['full','calm','off'].map(o=>`<option value="${o}" ${(t.anim||'full')==o?'selected':''}>${({full:'เต็มรูปแบบ',calm:'นุ่มนวล',off:'ปิดแอนิเมชัน'})[o]}</option>`).join('');
+  return `<h3>ธีมและแอนิเมชัน</h3><p class="mu">ปรับสีและความเคลื่อนไหวของทั้งชุมชน</p>
+  <div class="row"><label style="flex:1">สีหลัก<input id="th-a1" type="color" value="${t.a1||'#7c5cff'}"></label><label style="flex:1">สีรอง<input id="th-a2" type="color" value="${t.a2||'#34c3ff'}"></label><label style="flex:1">แอนิเมชัน<select id="th-anim">${sel()}</select></label></div>
+  <div class="row"><label style="flex:1">พื้นหลังชุมชน (รูปหรือ GIF ไม่บังคับ)<input id="th-bg" type="file" accept="image/*"></label><button class="g" onclick="clearTheme()">ล้างพื้นหลัง</button></div>
+  <div class="row"><button onclick="saveTheme()">บันทึกธีม</button></div>`}
+window.saveTheme=async()=>{try{const f=$('#th-bg').files[0];const t={...(srv.theme||{}),a1:$('#th-a1').value,a2:$('#th-a2').value,anim:$('#th-anim').value};
+  if(f){if(!f.type.startsWith('image/'))return toast('ต้องเป็นไฟล์รูปภาพ','err');toast('กำลังอัปโหลด…');t.bg=await upload(await shrink(f,1920))}
+  must(await sb.from('servers').update({theme:t}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('บันทึกธีมแล้ว','ok')}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err')}};
+window.clearTheme=async()=>{try{must(await sb.from('servers').update({theme:{...(srv.theme||{}),bg:null}}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('ล้างพื้นหลังแล้ว','ok')}catch(e){toast(e.message,'err')}};
+
+function evalAdminHtml(){if(!evCeo())return '';
+  const rooms=(chs||[]).filter(c=>c.eval_mode),cands=(chs||[]).filter(c=>c.kind!='voice');
+  const opt=(list,sel)=>list.map(c=>`<option value="${c.id}" ${c.id==sel?'selected':''}>${esc(c.name)}</option>`).join('');
+  const st={neon:'นีออน',gold:'ทอง',minimal:'มินิมอล'};
+  return `<h3>ห้องสอบ / ประกาศผล</h3><p class="mu">ห้องเสียงที่ตั้งเป็นห้องสอบ แอดมิน (คณะบริหาร+) กดบันทึกผลได้ขณะอยู่ในห้อง แล้วผลจะประกาศในห้องประกาศด้านล่าง</p>
+  <div class="row"><label style="flex:1">ห้องประกาศผล<select id="ev-ec"><option value="">— ยังไม่ตั้ง —</option>${opt(cands,srv.eval_channel_id)}</select></label><label style="flex:1">สไตล์การ์ด<select id="ev-st">${Object.keys(st).map(s=>`<option value="${s}" ${(srv.eval_style||'neon')==s?'selected':''}>${st[s]}</option>`).join('')}</select></label><button onclick="saveEvalCfg()">บันทึก</button></div>
+  ${rooms.map(c=>`<div class="row"><span>🎓 ${esc(c.name)} <span class="mu">(${c.eval_mode=='testrole'?'เทสโรล':'สอบสัมภาษ'})</span></span><span class="sp"></span><button class="d" onclick="delCh('${c.id}')">ลบ</button></div>`).join('')}
+  <div class="row"><input id="ev-rn" placeholder="ชื่อห้องสอบ เช่น สอบสัมภาษ-1"><select id="ev-rm" style="width:auto"><option value="interview">สอบสัมภาษ</option><option value="testrole">เทสโรล</option></select><button onclick="addEvRoom()">สร้างห้องสอบ</button></div>`}
+window.saveEvalCfg=async()=>{try{must(await sb.from('servers').update({eval_channel_id:$('#ev-ec').value||null,eval_style:$('#ev-st').value}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('บันทึกแล้ว','ok')}catch(e){toast(e.message,'err')}};
+window.addEvRoom=async()=>{const n=$('#ev-rn').value.trim().toLowerCase().replace(/\s+/g,'-');if(!n)return toast('ใส่ชื่อห้องสอบ','err');
+  const r=await sb.from('channels').insert({server_id:srv.id,name:n,kind:'voice',eval_mode:$('#ev-rm').value});if(r.error)return toast(r.error.message,'err');toast('สร้างห้องสอบแล้ว','ok');await pickSrv(srv.id);srvAdmin()};
+
+function evTop(){let b=$('#evBtn');const show=!!(ch&&ch.eval_mode&&rank(me)>=3);
+  if(!b){b=document.createElement('button');b.id='evBtn';b.className='g';b.onclick=evForm;$('#vcBtn').parentNode.insertBefore(b,$('#vcBtn'))}
+  b.textContent='📋 บันทึกผล';b.classList.toggle('hide',!show)}
+window.evForm=()=>{if(!ch?.eval_mode||rank(me)<3)return;const md=ch.eval_mode=='testrole'?'เทสโรล':'สอบสัมภาษ';
+  openModal(`<h3>📋 ${md} — บันทึกผล</h3><p class="mu">ผลจะถูกประกาศในห้องประกาศที่ CEO ตั้งไว้ทันที</p>
+  <div class="evf"><label>ชื่อผู้เข้าทดสอบ<input id="ev-n" maxlength="40"></label><label>อายุ<input id="ev-a" maxlength="12"></label><label>Xbox<input id="ev-x" maxlength="32"></label>
+  <label>ผลการทดสอบ<select id="ev-p"><option value="1">ผ่าน</option><option value="0">ไม่ผ่าน</option></select></label><label>คะแนน (0-100)<input id="ev-s" type="number" min="0" max="100" value="0"></label></div>
+  <div class="row"><button onclick="evSubmit()">บันทึกและประกาศ</button><button class="g" onclick="closeModal()">ยกเลิก</button></div>`)};
+window.evSubmit=async()=>{try{const n=$('#ev-n').value.trim();if(!n)return toast('ใส่ชื่อผู้เข้าทดสอบ','err');
+  const s=Math.min(100,Math.max(0,parseInt($('#ev-s').value)||0)),passed=$('#ev-p').value=='1',adminName=dn(me);
+  const c={mode:ch.eval_mode,name:n,age:$('#ev-a').value.trim(),xbox:$('#ev-x').value.trim(),passed,score:s,admin:adminName,style:srv.eval_style||'neon'};
+  must(await sb.from('evaluations').insert({server_id:srv.id,channel_id:ch.id,mode:c.mode,name:n,age:c.age,xbox:c.xbox,passed,score:s,admin_id:me.id,admin_name:adminName}).select());
+  if(!srv.eval_channel_id){closeModal();return toast('บันทึกผลแล้ว แต่ CEO ยังไม่ได้ตั้งห้องประกาศ','err')}
+  must(await sb.from('messages').insert({channel_id:srv.eval_channel_id,user_id:me.id,content:'',card:c}).select());
+  closeModal();toast('บันทึกและประกาศแล้ว','ok')}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err')}};
+
+function evCardHtml(c){const st=['neon','gold','minimal'].includes(c.style)?c.style:'neon',ok=!!c.passed;
+  const md=c.mode=='testrole'?'เทสโรล':'สอบสัมภาษ';
+  return `<div class="evc ${st} ${ok?'ok':'ng'}"><i class="evsh"></i>
+  <div class="evtop"><span class="evmode">${md}</span><span class="evres">${ok?'✔ ผ่าน':'✖ ไม่ผ่าน'}</span></div>
+  <div class="evname">${esc(c.name||'-')}</div>
+  <div class="evgrid"><div><small>อายุ</small><b>${esc(c.age||'-')}</b></div><div><small>Xbox</small><b>${esc(c.xbox||'-')}</b></div><div><small>คะแนน</small><b class="ev-score" data-to="${+c.score||0}">${+c.score||0}</b></div></div>
+  <div class="evfoot">ผู้ประเมิน <b>${esc(c.admin||'-')}</b></div></div>`}
+function evAnim(el){const still=document.body.dataset.anim=='off';
+  el.querySelectorAll('.ev-score').forEach(s=>{const to=+s.dataset.to||0;if(still)return;const t0=performance.now();
+    const step=t=>{const p=Math.min(1,(t-t0)/1000),e=1-Math.pow(1-p,3);s.textContent=Math.round(to*e);if(p<1)requestAnimationFrame(step)};s.textContent='0';requestAnimationFrame(step)})}
+
+/* ===== v9: ห้องโดเนท + โค้ดรับรางวัล ===== */
+const dhex=v=>/^#[0-9a-f]{6}$/i.test(v||'')?v:'#ff5d8f';
+async function renderDonate(){const box=$('#msgs');box.innerHTML='<div class="skel"></div><div class="skel"></div>';
+  const d=srv.donate||{};const {data,error}=await sb.from('donations').select('*').eq('server_id',srv.id).order('created_at',{ascending:false}).limit(300);
+  if(error){box.innerHTML='';return toast('โหลดโดเนทไม่สำเร็จ: '+error.message,'err')}
+  const list=data||[],ids=[...new Set(list.map(x=>x.user_id))];await Promise.all(ids.map(i=>user(i)));
+  const ok=list.filter(x=>x.status=='confirmed'),pend=list.filter(x=>x.status=='pending');
+  const total=ok.reduce((a,x)=>a+x.amount,0),goal=+d.goal||0,pct=goal?Math.min(100,total*100/goal):0;
+  const top={};ok.forEach(x=>top[x.user_id]=(top[x.user_id]||0)+x.amount);
+  const board=Object.entries(top).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const medal=['🥇','🥈','🥉'];const link=safeUrl(d.link),qr=safeUrl(d.qr_url);
+  const who=id=>name(P[id]||{id,alias:'ผู้ใช้'});
+  box.innerHTML=`<div class="dn" style="--dc:${dhex(d.color)}">
+    <section class="dn-hero"><i class="dn-orb o1"></i><i class="dn-orb o2"></i>
+      <span class="dn-kick">💖 DONATE</span><h2>${esc(d.title||'สนับสนุนชุมชน')}</h2><p>${esc(d.msg||'ขอบคุณทุกการสนับสนุน ❤')}</p>
+      <div class="dn-goal"><div class="dn-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
+        <div class="dn-nums"><b>฿${total.toLocaleString('th-TH')}</b><span>${goal?`เป้าหมาย ฿${goal.toLocaleString('th-TH')} · ${Math.floor(pct)}%`:'ยังไม่ตั้งเป้าหมาย'}</span></div></div>
+    </section>
+    <div class="dn-grid">
+      <div class="dn-card dn-qr">${qr?`<div class="dn-qrf"><img src="${esc(qr)}" alt="QR" loading="lazy"></div>`:'<div class="dn-qrf dn-noqr">ยังไม่มี QR</div>'}<p>สแกนเพื่อโดเนท</p>${link?`<a class="dn-link" href="${esc(link)}" target="_blank" rel="noopener">เปิดลิงก์โดเนท ↗</a>`:''}</div>
+      <div class="dn-card"><h3>แจ้งโดเนท</h3><p class="mu">โอนแล้วกรอกยอดด้านล่าง ทีมงานจะยืนยันให้</p>
+        <input id="dn-amt" type="number" min="1" placeholder="จำนวนเงิน (บาท)"><input id="dn-note" maxlength="120" placeholder="ข้อความถึงชุมชน (ไม่บังคับ)"><button onclick="donateSubmit()">แจ้งโดเนท</button></div>
+      <div class="dn-card"><h3>🏆 Top ผู้สนับสนุน</h3>${board.map(([id,v],i)=>`<div class="dn-row" style="animation-delay:${i*.06}s"><span>${medal[i]||'#'+(i+1)}</span><span class="dn-who">${who(id)}</span><b>฿${v.toLocaleString('th-TH')}</b></div>`).join('')||'<span class="mu">ยังไม่มีผู้สนับสนุน</span>'}</div>
+      <div class="dn-card dn-wide"><h3>ข้อความจากผู้สนับสนุน</h3>${ok.filter(x=>x.note).slice(0,30).map((x,i)=>`<div class="dn-msg" style="animation-delay:${i*.05}s"><b>${who(x.user_id)}</b> <span class="mu">฿${x.amount.toLocaleString('th-TH')}</span><p>${esc(x.note)}</p></div>`).join('')||'<span class="mu">ยังไม่มีข้อความ</span>'}</div>
+      ${evCeo()&&pend.length?`<div class="dn-card dn-wide"><h3>รอยืนยัน (${pend.length})</h3>${pend.map(x=>`<div class="dn-row"><span class="dn-who">${who(x.user_id)}</span><b>฿${x.amount.toLocaleString('th-TH')}</b><span class="mu">${esc(x.note||'')}</span><span class="sp"></span><button onclick="dnSet('${x.id}','confirmed')">ยืนยัน</button><button class="d" onclick="dnSet('${x.id}',null)">ลบ</button></div>`).join('')}</div>`:''}
+    </div></div>`;
+  box.scrollTop=0}
+window.donateSubmit=async()=>{try{const amt=Math.floor(+$('#dn-amt').value);if(!(amt>0))return toast('ใส่จำนวนเงินให้ถูกต้อง','err');
+  must(await sb.from('donations').insert({server_id:srv.id,user_id:me.id,amount:amt,note:$('#dn-note').value.trim()}).select());toast('ส่งแจ้งโดเนทแล้ว รอยืนยัน','ok');renderDonate()}catch(e){toast(e.message,'err')}};
+window.dnSet=async(id,st)=>{try{if(st)must(await sb.from('donations').update({status:st}).eq('id',id).select());else must(await sb.from('donations').delete().eq('id',id).select());renderDonate()}catch(e){toast(e.message,'err')}};
+function donateAdminHtml(){if(!evCeo())return '';const d=srv.donate||{};
+  return `<h3>โดเนท</h3><p class="mu">สร้างห้องโดเนท แล้วตั้งหน้าตา เป้าหมาย และ QR ได้ (การโอนจริงทำนอกแอป ผู้ใช้แจ้งยอดแล้ว CEO ยืนยัน)</p>
+  <div class="row"><input id="dn-rn" placeholder="ชื่อห้อง เช่น donate" style="flex:1"><button onclick="addDonRoom()">สร้างห้องโดเนท</button></div>
+  <div class="row"><label style="flex:1">หัวข้อ<input id="dc-t" maxlength="60" value="${esc(d.title||'')}"></label><label style="flex:1">เป้าหมาย (บาท)<input id="dc-g" type="number" min="0" value="${+d.goal||0}"></label></div>
+  <label>ข้อความถึงผู้สนับสนุน<input id="dc-m" maxlength="160" value="${esc(d.msg||'')}"></label>
+  <div class="row"><label style="flex:1">สีธีม<input id="dc-c" type="color" value="${dhex(d.color)}"></label><label style="flex:2">ลิงก์โดเนท (ไม่บังคับ)<input id="dc-l" maxlength="300" value="${esc(d.link||'')}"></label></div>
+  <div class="row"><label style="flex:1">รูป QR Code<input id="dc-q" type="file" accept="image/*"></label>${safeUrl(d.qr_url)?`<img src="${esc(safeUrl(d.qr_url))}" class="rwth" alt="">`:''}</div>
+  <div class="row"><button onclick="saveDonate()">บันทึกหน้าโดเนท</button></div>`}
+window.saveDonate=async()=>{try{const f=$('#dc-q').files[0];const d={...(srv.donate||{}),title:$('#dc-t').value.trim(),goal:+$('#dc-g').value||0,msg:$('#dc-m').value.trim(),color:dhex($('#dc-c').value),link:$('#dc-l').value.trim()};
+  if(f){if(!f.type.startsWith('image/'))return toast('ต้องเป็นไฟล์รูปภาพ','err');toast('กำลังอัปโหลด…');d.qr_url=await upload(await shrink(f,768))}
+  must(await sb.from('servers').update({donate:d}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('บันทึกหน้าโดเนทแล้ว','ok')}catch(e){toast(e.message,'err')}};
+window.addDonRoom=async()=>{const n=$('#dn-rn').value.trim().toLowerCase().replace(/\s+/g,'-');if(!n)return toast('ใส่ชื่อห้อง','err');
+  const r=await sb.from('channels').insert({server_id:srv.id,name:n,kind:'donate'});if(r.error)return toast(r.error.message,'err');toast('สร้างห้องโดเนทแล้ว','ok');await pickSrv(srv.id);srvAdmin()};
+
+/* โค้ดรับรางวัล */
+function codeTop(){if(!srv||$('#codeBtn'))return;const b=document.createElement('button');b.id='codeBtn';b.className='g';b.textContent='🎟 โค้ด';b.onclick=codeForm;$('#memBtn').parentNode.insertBefore(b,$('#memBtn'))}
+window.codeForm=()=>openModal(`<h3>🎟 ใส่โค้ดรับรางวัล</h3><p class="mu">รับยศ กรอบโปรไฟล์ หรือป้ายชื่อ · โค้ดแต่ละอันใช้ได้ครั้งเดียวต่อบัญชี</p>
+  <div class="row"><input id="rc-in" maxlength="40" placeholder="ใส่โค้ดที่นี่" style="flex:1"><button onclick="redeemCode()">รับรางวัล</button></div>`);
+window.redeemCode=async()=>{try{const c=$('#rc-in').value.trim();if(!c)return toast('ใส่โค้ด','err');
+  const {data,error}=await sb.rpc('redeem_code',{p_server:srv.id,p_code:c});if(error)throw error;
+  closeModal();await pickSrv(srv.id);if(me){const r=await sb.from('profiles').select('*').eq('id',me.id).single();if(r.data){me=r.data;P[me.id]=me;renderMe()}}
+  rewardFx(data?.name||'รางวัล',data?.type)}catch(e){toast(e.message.replace(/^.*?:\s*(?=[^:]*$)/,''),'err')}};
+function rewardFx(name,type){const kind=type=='role'?'ยศใหม่':type=='frame'?'กรอบโปรไฟล์':type=='plate'?'ป้ายชื่อ':'รางวัล';
+  openModal(`<div class="rfx"><div class="rfx-burst"></div><div class="rfx-ico">🎉</div><small class="rfx-k">${kind}</small><h3 class="rfx-n">${esc(name)}</h3><p class="mu">ได้รับแล้ว! ดูได้ในโปรไฟล์ของคุณ</p></div>`)}
+function codeAdminHtml(){if(!evCeo())return '';
+  const opts=[...roles.map(r=>`<option value="r:${r.id}">ยศ: ${esc(r.name)}</option>`),...srvRewards.map(w=>`<option value="w:${w.id}">${w.kind=='frame'?'กรอบ':'ป้ายชื่อ'}: ${esc(w.name)}</option>`)].join('');
+  setTimeout(loadCodeList,0);
+  return `<h3>โค้ดรับรางวัล</h3><p class="mu">สร้างโค้ดให้ยศ กรอบ หรือป้ายชื่อ กำหนดจำนวนคนที่ใช้ได้และวันหมดอายุได้</p>
+  <div class="row"><input id="cd-c" maxlength="40" placeholder="โค้ด (ว่างไว้ = สุ่ม)" style="flex:1"><select id="cd-t" style="flex:1">${opts||'<option value="">ยังไม่มียศหรือรางวัล</option>'}</select></div>
+  <div class="row"><input id="cd-m" type="number" min="1" placeholder="ใช้ได้กี่คน (ว่าง = ไม่จำกัด)" style="flex:1"><input id="cd-e" type="datetime-local" style="flex:1" title="วันหมดอายุ (ว่าง = ไม่หมดอายุ)"><button onclick="addCode()">สร้างโค้ด</button></div>
+  <div id="cdlist"></div>`}
+window.addCode=async()=>{try{const v=$('#cd-t').value;if(!v)return toast('เลือกยศหรือรางวัลก่อน','err');const [k,id]=v.split(':');
+  const code=($('#cd-c').value.trim()||Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%32]).join('')).toUpperCase();
+  const w=k=='w'?srvRewards.find(x=>x.id==id):null;
+  const row={server_id:srv.id,code,reward_type:k=='r'?'role':w.kind,role_id:k=='r'?id:null,reward_id:k=='w'?id:null,
+    max_uses:$('#cd-m').value?parseInt($('#cd-m').value):null,expires_at:$('#cd-e').value?new Date($('#cd-e').value).toISOString():null};
+  must(await sb.from('redeem_codes').insert(row).select());toast('สร้างโค้ดแล้ว: '+code,'ok');srvAdmin()}catch(e){toast(e.message,'err')}};
+async function loadCodeList(){const el=$('#cdlist');if(!el||!srv)return;const {data,error}=await sb.from('redeem_codes').select('*').eq('server_id',srv.id).order('created_at',{ascending:false});
+  if(error)return el.innerHTML=`<span class="mu">${esc(error.message)}</span>`;
+  const lbl=c=>c.reward_type=='role'?(roles.find(r=>r.id==c.role_id)?.name||'ยศ'):(srvRewards.find(r=>r.id==c.reward_id)?.name||'รางวัล');
+  const now=Date.now();
+  el.innerHTML=(data||[]).map(c=>{const exp=!!c.expires_at&&new Date(c.expires_at).getTime()<now,full=c.max_uses!=null&&c.uses>=c.max_uses;
+    return `<div class="row cdr ${exp||full?'dead':''}"><code>${esc(c.code)}</code><span>${esc(lbl(c))}</span><span class="sp"></span><span class="mu">ใช้แล้ว ${c.uses}${c.max_uses!=null?'/'+c.max_uses:''}${c.expires_at?' · '+(exp?'หมดอายุแล้ว':'ถึง '+new Date(c.expires_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})):''}</span><button class="d" onclick="delCode('${c.id}')">ลบ</button></div>`}).join('')||'<span class="mu">ยังไม่มีโค้ด</span>'}
+window.delCode=async id=>{try{must(await sb.from('redeem_codes').delete().eq('id',id).select());srvAdmin()}catch(e){toast(e.message,'err')}};
+
+/* พื้นหลัง/รูปโปรไฟล์: ทุกคนทำได้ รองรับ GIF */
+window.clearImg=async k=>{try{must(await sb.from('profiles').update({[k]:null}).eq('id',me.id).select());const r=await sb.from('profiles').select('*').eq('id',me.id).single();me=r.data;P[me.id]=me;renderMe();showProfile(me.id);toast('ล้างแล้ว','ok')}catch(e){toast(e.message,'err')}};
