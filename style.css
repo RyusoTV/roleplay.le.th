@@ -228,3 +228,72 @@ button:hover::after{transform:translateX(120%)}
 @keyframes rfxburst{0%{transform:scale(.2);opacity:.9}100%{transform:scale(1.6);opacity:0}}
 @keyframes rfxpop{0%{transform:scale(.2) rotate(-20deg);opacity:0}60%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
 @media (prefers-reduced-motion:reduce){.dn *,.rfx *{animation:none!important}}
+
+/* ===== v10: ห้องเสียงแบบใหม่ (กริด + แชทด้านข้าง), ขอบเขียวเมื่อพูด ===== */
+#chatView:has(#vc:not(.hide)){display:grid!important;grid-template-columns:minmax(0,1fr) min(380px,36%);grid-template-rows:auto minmax(0,1fr) auto auto;min-height:0}
+#chatView:has(#vc:not(.hide))>#top{grid-column:1/-1;grid-row:1}
+#chatView:has(#vc:not(.hide))>#vc{grid-column:1;grid-row:2/5;min-height:0;display:flex;flex-direction:column;background:radial-gradient(ellipse at top,rgba(124,92,255,.12),transparent 60%),#06070d}
+#chatView:has(#vc:not(.hide))>#msgs{grid-column:2;grid-row:2;min-height:0;overflow:auto;border-left:1px solid var(--bd)}
+#chatView:has(#vc:not(.hide))>#send{grid-column:2;grid-row:3;margin:8px}
+#chatView:has(#vc:not(.hide))>#reply,#chatView:has(#vc:not(.hide))>#chip{grid-column:2;grid-row:4}
+#chatView.vc-nochat:has(#vc:not(.hide)){grid-template-columns:1fr}
+#chatView.vc-nochat:has(#vc:not(.hide))>#msgs,#chatView.vc-nochat:has(#vc:not(.hide))>#send,#chatView.vc-nochat:has(#vc:not(.hide))>#reply,#chatView.vc-nochat:has(#vc:not(.hide))>#chip{display:none!important}
+#chatView.vc-nochat:has(#vc:not(.hide))>#vc{grid-column:1/-1}
+@media (max-width:760px){#chatView:has(#vc:not(.hide)){grid-template-columns:1fr;grid-template-rows:auto minmax(260px,46vh) minmax(0,1fr) auto auto}
+  #chatView:has(#vc:not(.hide))>#vc{grid-column:1;grid-row:2}#chatView:has(#vc:not(.hide))>#msgs{grid-column:1;grid-row:3;border-left:0;border-top:1px solid var(--bd)}
+  #chatView:has(#vc:not(.hide))>#send{grid-column:1;grid-row:4}#chatView:has(#vc:not(.hide))>#reply,#chatView:has(#vc:not(.hide))>#chip{grid-column:1;grid-row:5}}
+.stage{flex:1;min-height:0;display:grid;gap:10px;padding:14px;align-content:center;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));overflow:auto}
+.tile{position:relative;aspect-ratio:16/10;border-radius:22px;overflow:hidden;background:linear-gradient(160deg,#1f2446,#0b0d1a);border:3px solid transparent;transition:border-color .2s,box-shadow .25s,transform .25s var(--ease);animation:fadeUp .4s var(--ease) both}
+.tile:hover{transform:translateY(-2px)}
+.tile.speaking{border-color:#23d160;box-shadow:0 0 0 2px #23d16044,0 0 34px -4px #23d160aa;animation:spkpulse 1.4s ease-in-out infinite}
+@keyframes spkpulse{50%{box-shadow:0 0 0 4px #23d16033,0 0 46px -2px #23d160cc}}
+.tile .tcenter{position:absolute;inset:0;display:grid;place-items:center}
+.tile .tn{position:absolute;left:10px;bottom:10px;max-width:calc(100% - 20px);background:rgba(0,0,0,.55);backdrop-filter:blur(8px);border-radius:12px;padding:4px 10px;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.speaking .tn{background:#23d160;color:#04150a}
+.tile.hasv .tcenter{display:none}
+.vbar{display:flex;justify-content:center;align-items:center;gap:12px;padding:14px;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent)}
+.vb{width:52px;height:52px;border-radius:50%;padding:0;display:grid;place-items:center;font-size:20px;background:rgba(255,255,255,.08);box-shadow:none;border:1px solid var(--bd)}
+.vb:hover{background:rgba(255,255,255,.16)}
+.vb.off{background:#ff5d7322;border-color:#ff5d7355}
+.vb.on{background:var(--grad);box-shadow:0 0 20px -4px var(--a1)}
+.vb.end{background:#ff3d5a;border-color:transparent;width:64px;border-radius:999px}
+.vb.end:hover{background:#ff5d73}
+
+/* ห้องจ่ายเงิน + ส่งไอเทม */
+.pay{--pc:#ff5d8f;display:grid;gap:14px;padding:6px 4px 18px;animation:fadeUp .4s var(--ease) both}
+.pay-hero{position:relative;overflow:hidden;border-radius:24px;padding:26px 24px;background:linear-gradient(135deg,color-mix(in srgb,var(--pc) 30%,#0b0d18),#0b0d18 70%);border:1px solid color-mix(in srgb,var(--pc) 40%,transparent);isolation:isolate}
+.pay-hero h2{margin:6px 0 4px;font-size:clamp(22px,4vw,30px)}
+.pay-hero p{margin:0;color:#d8dcf0;white-space:pre-line}
+.pay-rules{display:block;margin-top:10px;color:var(--mu);white-space:pre-line}
+.pay-hero .dn-orb.o1{background:var(--pc)}
+.pay-tabs{display:flex;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.04);padding:6px;border-radius:16px;width:fit-content;max-width:100%}
+.pay-tabs button{box-shadow:none;transition:background .3s,transform .2s}
+.pay-tabs button.on{background:var(--grad)}
+.pay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.pay-card{background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--bd);border-radius:20px;padding:18px;display:grid;gap:10px;align-content:start;animation:fadeUp .5s var(--ease) both;position:relative}
+.pay-card h3{margin:0;font-size:16px}
+.pay-wide{grid-column:1/-1}
+.pay-qr{justify-items:center;text-align:center}
+.pay-amt{display:flex;align-items:baseline;gap:8px;margin:4px 0}
+.pay-amt b{font-size:44px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1;animation:pop .6s var(--ease) both}
+.pay-amt span{color:var(--mu);font-weight:700}
+.pay-file{border:1px dashed color-mix(in srgb,var(--a1) 60%,transparent);border-radius:14px;padding:12px;cursor:pointer;color:var(--tx);transition:background .2s}
+.pay-file:hover{background:rgba(124,92,255,.08)}
+.pay-file[data-f]::after{content:"✔ " attr(data-f);display:block;margin-top:4px;color:var(--ok);font-size:12px;word-break:break-all}
+.item-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.item-form button{grid-column:1/-1;justify-self:start}
+.pc{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.pc.wait{background:#ffb84d22;color:#ffc766}.pc.ok{background:#3ddc9722;color:var(--ok)}.pc.ng{background:#ff5d7322;color:var(--bad)}
+.item-rv{display:grid;gap:10px}
+.ir-top{display:flex;gap:12px;align-items:center}
+.ir-top img{width:96px;height:72px;object-fit:cover;border-radius:12px;cursor:zoom-in;transition:transform .25s var(--ease);flex:none;border:1px solid var(--bd)}
+.ir-top img:hover{transform:scale(1.05)}
+.ir-info{display:grid;gap:2px;min-width:0}
+.ir-tags,.ir-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ir-file{text-decoration:none;font-size:13px}
+
+/* การ์ดประกาศไอเทม/การชำระเงิน */
+.evc.ann .evgrid.one{grid-template-columns:1fr}
+.evc.ann.item .evname{font-size:20px}
+.evc.ann.pay{border-color:#3ddc9766}
+.evc.ann.wait{border-color:#ffb84d66}

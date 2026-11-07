@@ -315,7 +315,7 @@ function roleTag(r){const m=roleNameMode(r),g1=hx(r.grad1)||'#7c5cff',g2=hx(r.gr
 const roleChipsHtml=rs=>rs.length?`<div class="row">${rs.map(roleTag).join('')}</div>`:'';
 
 // ไอคอนห้องตามประเภท (CEO ปรับได้)
-function iconFor(c){if(c.kind=='donate')return '💖';const m=srv?.icon_map||{};const k=c.kind=='voice'?'voice':c.kind=='announce'?'announce':'text';
+function iconFor(c){if(c.kind=='donate')return '💖';if(c.kind=='pay')return '🛒';const m=srv?.icon_map||{};const k=c.kind=='voice'?'voice':c.kind=='announce'?'announce':'text';
   return m[k]||(k=='voice'?'🔊':k=='announce'?'📢':'#')}
 function iconAdminHtml(){const m=srv?.icon_map||{};
   return `<h3>ไอคอนห้อง</h3><p class="mu">เปลี่ยนไอคอนของแต่ละประเภทห้องได้ (อีโมจิสั้นๆ)</p>
@@ -489,7 +489,7 @@ window.evSubmit=async()=>{try{const n=$('#ev-n').value.trim();if(!n)return toast
   must(await sb.from('messages').insert({channel_id:srv.eval_channel_id,user_id:me.id,content:'',card:c}).select());
   closeModal();toast('บันทึกและประกาศแล้ว','ok')}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err')}};
 
-function evCardHtml(c){const st=['neon','gold','minimal'].includes(c.style)?c.style:'neon',ok=!!c.passed;
+function evCardHtml(c){if(c.type)return annCardHtml(c);const st=['neon','gold','minimal'].includes(c.style)?c.style:'neon',ok=!!c.passed;
   const md=c.mode=='testrole'?'เทสโรล':'สอบสัมภาษ';
   return `<div class="evc ${st} ${ok?'ok':'ng'}"><i class="evsh"></i>
   <div class="evtop"><span class="evmode">${md}</span><span class="evres">${ok?'✔ ผ่าน':'✖ ไม่ผ่าน'}</span></div>
@@ -577,3 +577,99 @@ window.delCode=async id=>{try{must(await sb.from('redeem_codes').delete().eq('id
 
 /* พื้นหลัง/รูปโปรไฟล์: ทุกคนทำได้ รองรับ GIF */
 window.clearImg=async k=>{try{must(await sb.from('profiles').update({[k]:null}).eq('id',me.id).select());const r=await sb.from('profiles').select('*').eq('id',me.id).single();me=r.data;P[me.id]=me;renderMe();showProfile(me.id);toast('ล้างแล้ว','ok')}catch(e){toast(e.message,'err')}};
+
+/* ===== v10: ตรวจจับคนพูด (ขอบเขียว), แชทในห้องเสียง ===== */
+const spk={},spkOn={};
+function watchSpeak(id,track){try{window.__ac=window.__ac||new (window.AudioContext||window.webkitAudioContext)();window.__ac.resume&&window.__ac.resume();
+  const src=window.__ac.createMediaStreamSource(new MediaStream([track])),an=window.__ac.createAnalyser();an.fftSize=512;src.connect(an);
+  spk[id]={src,an,buf:new Uint8Array(an.fftSize)}}catch(e){console.warn('speak',e)}}
+setInterval(()=>{for(const id in spk){const s=spk[id];s.an.getByteTimeDomainData(s.buf);let t=0;for(const v of s.buf){const x=(v-128)/128;t+=x*x}
+  const on=Math.sqrt(t/s.buf.length)>0.025;if(on!==!!spkOn[id]){if(on)spkOn[id]=1;else delete spkOn[id];document.querySelector(`#vc .tile[data-id="${id}"]`)?.classList.toggle('speaking',on)}}},120);
+window.vcChatToggle=()=>$('#chatView').classList.toggle('vc-nochat');
+
+/* ===== v10: ห้องจ่ายเงิน + ส่งไอเทม ===== */
+let payTab='pay';
+const pyCur=p=>esc(p.currency||'บาท');
+async function renderPay(){const box=$('#msgs');box.innerHTML='<div class="skel"></div><div class="skel"></div>';const p=srv.pay||{},ceo=evCeo();
+  const [o,s]=await Promise.all([sb.from('pay_orders').select('*').eq('server_id',srv.id).order('created_at',{ascending:false}).limit(200),
+    sb.from('item_submissions').select('*').eq('server_id',srv.id).order('created_at',{ascending:false}).limit(300)]);
+  if(o.error||s.error){box.innerHTML='';return toast((o.error||s.error).message,'err')}
+  const orders=o.data||[],subs=s.data||[];
+  await Promise.all([...new Set([...orders,...subs].map(x=>x.user_id))].map(i=>user(i)));
+  const who=id=>name(P[id]||{id,alias:'ผู้ใช้'});
+  const tabs=[['pay','💳 ชำระเงิน'],['item','📦 ส่งไอเทม'],...(ceo?[['review',`🗂 รายการ (${subs.filter(x=>x.status=='pending').length+orders.filter(x=>x.status=='pending').length})`]]:[])];
+  if(!tabs.some(t=>t[0]==payTab))payTab='pay';
+  const price=+p.price||0,cat=(p.categories||[]);
+  const myOrders=orders.filter(x=>x.user_id==me.id),mySubs=subs.filter(x=>x.user_id==me.id);
+  const stChip=x=>({pending:'<span class="pc wait">รอตรวจ</span>',confirmed:'<span class="pc ok">ยืนยันแล้ว</span>',rejected:'<span class="pc ng">ไม่ผ่าน</span>',approved:'<span class="pc ok">อนุมัติแล้ว</span>'})[x.status]||'';
+  let body='';
+  if(payTab=='pay'){body=`<div class="pay-grid">
+    <div class="pay-card pay-qr">${safeUrl(p.qr_url)?`<div class="dn-qrf"><img src="${esc(safeUrl(p.qr_url))}" alt="QR" loading="lazy"></div>`:'<div class="dn-qrf dn-noqr">ยังไม่มี QR</div>'}
+      ${safeUrl(p.link)?`<a class="dn-link" href="${esc(safeUrl(p.link))}" target="_blank" rel="noopener">ไปหน้าชำระเงิน ↗</a>`:''}</div>
+    <div class="pay-card"><h3>แจ้งชำระเงิน</h3><p class="mu">ยอดที่ต้องชำระคงที่ตามที่ CEO กำหนด</p>
+      <div class="pay-amt"><b>${price.toLocaleString('th-TH')}</b><span>${pyCur(p)}</span></div>
+      <input id="py-note" maxlength="120" placeholder="หมายเหตุ เช่น เวลาที่โอน (ไม่บังคับ)"><label class="pay-file">🧾 แนบสลิป (ไม่บังคับ)<input id="py-slip" type="file" accept="image/*" hidden onchange="this.parentNode.dataset.f=this.files[0]?.name||''"></label>
+      <button onclick="paySubmit()" ${price<=0?'disabled':''}>แจ้งชำระ ${price.toLocaleString('th-TH')} ${pyCur(p)}</button></div>
+    <div class="pay-card pay-wide"><h3>รายการแจ้งชำระของคุณ</h3>${myOrders.map(x=>`<div class="dn-row"><b>${x.amount.toLocaleString('th-TH')}</b><span class="mu">${new Date(x.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</span><span class="sp"></span>${stChip(x)}</div>`).join('')||'<span class="mu">ยังไม่เคยแจ้งชำระ</span>'}</div></div>`}
+  if(payTab=='item'){body=`<div class="pay-grid"><div class="pay-card pay-wide"><h3>📦 ส่งไอเทมให้ CEO</h3><p class="mu">${esc(p.item_desc||'กรอกข้อมูลให้ครบ ระบบจะส่งให้ CEO ตรวจสอบเท่านั้น')}</p>
+    <div class="item-form"><label>ชื่อ Xbox<input id="it-x" maxlength="40"></label><label>ชื่อไอเทม<input id="it-n" maxlength="80"></label>
+    <label>หมวดหมู่${cat.length?`<select id="it-c">${cat.map(c=>`<option>${esc(c)}</option>`).join('')}</select>`:'<input id="it-c" maxlength="40" placeholder="เช่น สกิน">'}</label>
+    <label class="pay-file">🖼 รูปแสดงการโอนค่าสกิน (จำเป็น)<input id="it-p" type="file" accept="image/*" hidden onchange="this.parentNode.dataset.f=this.files[0]?.name||''"></label>
+    <label class="pay-file">📎 ไฟล์ที่ส่ง (จำเป็น)<input id="it-f" type="file" hidden onchange="this.parentNode.dataset.f=this.files[0]?.name||''"></label>
+    <button onclick="itemSubmit()">ส่งให้ CEO</button></div></div>
+    <div class="pay-card pay-wide"><h3>สถานะของคุณ</h3>${mySubs.map(x=>`<div class="dn-row"><b>${esc(x.item_name)}</b><span class="mu">${esc(x.category||'')}</span><span class="sp"></span>${stChip(x)}${x.in_server?'<span class="pc ok">🟢 ลงในเซิร์ฟแล้ว</span>':''}</div>`).join('')||'<span class="mu">ยังไม่มีการส่งไอเทม</span>'}</div></div>`}
+  if(payTab=='review'&&ceo){body=`<div class="pay-grid">
+    <div class="pay-card pay-wide"><h3>💳 แจ้งชำระรอตรวจ</h3>${orders.filter(x=>x.status=='pending').map(x=>`<div class="dn-row"><span class="dn-who">${who(x.user_id)}</span><b>${x.amount.toLocaleString('th-TH')}</b><span class="mu">${esc(x.note||'')}</span>${x.slip_url?`<a href="${esc(safeUrl(x.slip_url))}" target="_blank" rel="noopener">สลิป</a>`:''}<span class="sp"></span><button onclick="orderAct('${x.id}','confirmed')">ยืนยัน</button><button class="d" onclick="orderAct('${x.id}','rejected')">ไม่ผ่าน</button></div>`).join('')||'<span class="mu">ไม่มีรายการรอตรวจ</span>'}</div>
+    ${subs.map((x,i)=>`<div class="pay-card item-rv" style="animation-delay:${i*.05}s"><div class="ir-top"><img src="${esc(safeUrl(x.proof_url)||'')}" alt="" onclick="viewImg('${esc(safeUrl(x.proof_url)||'')}')"><div class="ir-info"><b>${esc(x.item_name)}</b><span class="mu">${esc(x.category||'-')} · Xbox: <b>${esc(x.xbox_name)}</b></span><span class="mu">โดย ${who(x.user_id)}</span></div></div>
+      <div class="ir-tags">${stChip(x)}${x.in_server?'<span class="pc ok">🟢 ลงในเซิร์ฟแล้ว</span>':'<span class="pc wait">⏳ ยังไม่ลงในเซิร์ฟ</span>'}</div>
+      <div class="ir-acts">${x.file_url?`<a class="g ir-file" href="${esc(safeUrl(x.file_url))}" target="_blank" rel="noopener">📎 ${esc(x.file_name||'ไฟล์')}</a>`:''}
+      <button onclick="itemAct('${x.id}',{status:'approved'},'approved')">✅ อนุมัติ</button><button class="d" onclick="itemAct('${x.id}',{status:'rejected'},'rejected')">⛔ ไม่อนุมัติ</button>
+      <button class="g" onclick="itemAct('${x.id}',{in_server:${!x.in_server}},${x.in_server?"'notin'":"'in'"})">${x.in_server?'⏳ ยังไม่ลงในเซิร์ฟ':'🟢 ลงในเซิร์ฟแล้ว'}</button><button class="g" onclick="itemDel('${x.id}')">🗑</button></div></div>`).join('')}</div>`}
+  box.innerHTML=`<div class="pay" style="--pc:${dhex(p.color)}">
+    <section class="pay-hero"><i class="dn-orb o1"></i><span class="dn-kick">🛒 SHOP</span><h2>${esc(p.title||'ห้องจ่ายเงิน')}</h2><p>${esc(p.desc||'')}</p>${p.rules?`<small class="pay-rules">${esc(p.rules)}</small>`:''}</section>
+    <nav class="pay-tabs">${tabs.map(([k,l])=>`<button class="${payTab==k?'on':'g'}" onclick="paySwitch('${k}')">${l}</button>`).join('')}</nav>
+    ${body}</div>`;
+  box.scrollTop=0}
+window.paySwitch=t=>{payTab=t;renderPay()};
+async function upOrNull(f,max){return f?upload(await shrink(f,max)):null}
+window.paySubmit=async()=>{try{const p=srv.pay||{},amt=+p.price||0;if(amt<=0)return toast('CEO ยังไม่ได้ตั้งราคา','err');
+  const slip=await upOrNull($('#py-slip').files[0],1920);
+  must(await sb.from('pay_orders').insert({server_id:srv.id,user_id:me.id,amount:amt,note:$('#py-note').value.trim(),slip_url:slip}).select());
+  toast('แจ้งชำระแล้ว รอ CEO ยืนยัน','ok');renderPay()}catch(e){toast(e.message,'err')}};
+async function annPost(card){const cid=srv?.pay?.announce_channel_id;if(!cid)return toast('ยังไม่ได้ตั้งห้องประกาศ (ตั้งในการตั้งค่าชุมชน)','err');
+  try{must(await sb.from('messages').insert({channel_id:cid,user_id:me.id,content:'',card}).select())}catch(e){toast('ประกาศไม่สำเร็จ: '+e.message,'err')}}
+window.orderAct=async(id,st)=>{try{const o=must(await sb.from('pay_orders').update({status:st}).eq('id',id).select())[0];
+  if(st=='confirmed'){const u=P[o.user_id]||{};await annPost({type:'pay',kind:'confirmed',user:u.alias||u.display_name||'ผู้ใช้',amount:o.amount,cur:srv.pay?.currency||'บาท',style:srv.eval_style||'neon'})}
+  renderPay()}catch(e){toast(e.message,'err')}};
+window.itemSubmit=async()=>{try{const x=$('#it-x').value.trim(),n=$('#it-n').value.trim(),c=$('#it-c').value.trim(),pf=$('#it-p').files[0],ff=$('#it-f').files[0];
+  if(!x||!n)return toast('กรอกชื่อ Xbox และชื่อไอเทม','err');if(!pf)return toast('แนบรูปแสดงการโอนค่าสกิน','err');if(!ff)return toast('แนบไฟล์ที่ส่ง','err');
+  toast('กำลังส่ง…');const proof=await upload(await shrink(pf,1920)),file=await upload(ff);
+  must(await sb.from('item_submissions').insert({server_id:srv.id,user_id:me.id,xbox_name:x,item_name:n,category:c,proof_url:proof,file_url:file,file_name:ff.name}).select());
+  toast('ส่งให้ CEO แล้ว','ok');payTab='item';renderPay()}catch(e){toast('ส่งไม่สำเร็จ: '+e.message,'err')}};
+window.itemAct=async(id,patch,kind)=>{try{const it=must(await sb.from('item_submissions').update(patch).eq('id',id).select())[0];
+  await annPost({type:'item',kind,xbox:it.xbox_name,item:it.item_name,category:it.category||'-',user:P[it.user_id]?.alias||P[it.user_id]?.display_name||'ผู้ใช้',style:srv.eval_style||'neon'});
+  renderPay()}catch(e){toast(e.message,'err')}};
+window.itemDel=async id=>{try{must(await sb.from('item_submissions').delete().eq('id',id).select());renderPay()}catch(e){toast(e.message,'err')}};
+
+function annCardHtml(c){if(c.type=='pay')return `<div class="evc ann pay ok"><i class="evsh"></i><div class="evtop"><span class="evmode">ชำระเงิน</span><span class="evres">✔ ยืนยันแล้ว</span></div>
+  <div class="evname">${esc(c.user||'-')}</div><div class="evgrid one"><div><small>ยอดที่ชำระ</small><b class="ev-score" data-to="${+c.amount||0}">${+c.amount||0}</b></div></div><div class="evfoot">${esc(c.cur||'')}</div></div>`;
+  const map={approved:['ok','✅ อนุมัติแล้ว'],rejected:['ng','⛔ ไม่อนุมัติ'],in:['ok','🟢 ลงในเซิร์ฟแล้ว'],notin:['wait','⏳ ยังไม่ลงในเซิร์ฟ']}[c.kind]||['wait','•'];
+  return `<div class="evc ann item ${map[0]}"><i class="evsh"></i><div class="evtop"><span class="evmode">ส่งไอเทม</span><span class="evres">${map[1]}</span></div>
+  <div class="evname">${esc(c.item||'-')}</div><div class="evgrid"><div><small>Xbox</small><b>${esc(c.xbox||'-')}</b></div><div><small>หมวดหมู่</small><b>${esc(c.category||'-')}</b></div><div><small>ผู้ส่ง</small><b>${esc(c.user||'-')}</b></div></div></div>`}
+function payAdminHtml(){if(!evCeo())return '';const p=srv.pay||{},rooms=(chs||[]).filter(c=>c.kind=='pay'),cands=(chs||[]).filter(c=>c.kind!='voice');
+  return `<h3>ห้องจ่ายเงิน & ส่งไอเทม</h3><p class="mu">มี 1 ห้อง ราคาคงที่ ผู้ใช้แจ้งชำระแล้ว CEO ยืนยัน · รายการส่งไอเทมเห็นเฉพาะ CEO</p>
+  ${rooms.length?rooms.map(c=>`<div class="row"><span>🛒 ${esc(c.name)}</span><span class="sp"></span><button class="d" onclick="delCh('${c.id}')">ลบห้อง</button></div>`).join(''):`<div class="row"><input id="py-rn" placeholder="ชื่อห้อง เช่น shop" style="flex:1"><button onclick="addPayRoom()">สร้างห้องจ่ายเงิน</button></div>`}
+  <div class="row"><label style="flex:1">หัวข้อ<input id="py-t" maxlength="60" value="${esc(p.title||'')}"></label><label style="flex:1">ราคา (ต้องจ่ายเท่าไหร่)<input id="py-p" type="number" min="0" value="${+p.price||0}"></label><label style="flex:1">หน่วยเงิน<input id="py-c" maxlength="10" value="${esc(p.currency||'บาท')}"></label></div>
+  <label>คำอธิบาย<textarea id="py-d" rows="3" maxlength="600">${esc(p.desc||'')}</textarea></label>
+  <label>กติกา / หมายเหตุ<textarea id="py-r" rows="2" maxlength="400">${esc(p.rules||'')}</textarea></label>
+  <div class="row"><label style="flex:1">หมวดหมู่ไอเทม (คั่นด้วยจุลภาค)<input id="py-k" maxlength="200" value="${esc((p.categories||[]).join(', '))}"></label><label style="flex:1">คำอธิบายหน้าส่งไอเทม<input id="py-id" maxlength="200" value="${esc(p.item_desc||'')}"></label></div>
+  <div class="row"><label style="flex:1">ห้องประกาศ<select id="py-ac"><option value="">— ยังไม่ตั้ง —</option>${cands.map(c=>`<option value="${c.id}" ${c.id==p.announce_channel_id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label style="flex:1">สีธีม<input id="py-col" type="color" value="${dhex(p.color)}"></label></div>
+  <div class="row"><label style="flex:1">ลิงก์ชำระเงิน (ไม่บังคับ)<input id="py-l" maxlength="300" value="${esc(p.link||'')}"></label><label style="flex:1">รูป QR<input id="py-q" type="file" accept="image/*"></label>${safeUrl(p.qr_url)?`<img class="rwth" src="${esc(safeUrl(p.qr_url))}" alt="">`:''}</div>
+  <div class="row"><button onclick="savePay()">บันทึกห้องจ่ายเงิน</button></div>`}
+window.savePay=async()=>{try{const f=$('#py-q').files[0];const p={...(srv.pay||{}),title:$('#py-t').value.trim(),price:Math.max(0,Math.floor(+$('#py-p').value||0)),currency:$('#py-c').value.trim()||'บาท',
+  desc:$('#py-d').value.trim(),rules:$('#py-r').value.trim(),categories:$('#py-k').value.split(',').map(x=>x.trim()).filter(Boolean),item_desc:$('#py-id').value.trim(),
+  announce_channel_id:$('#py-ac').value||null,color:dhex($('#py-col').value),link:$('#py-l').value.trim()};
+  if(f){if(!f.type.startsWith('image/'))return toast('ต้องเป็นไฟล์รูปภาพ','err');toast('กำลังอัปโหลด…');p.qr_url=await upload(await shrink(f,768))}
+  must(await sb.from('servers').update({pay:p}).eq('id',srv.id).select());await loadServers(srv.id);srvAdmin();toast('บันทึกแล้ว','ok')}catch(e){toast(e.message,'err')}};
+window.addPayRoom=async()=>{const n=$('#py-rn').value.trim().toLowerCase().replace(/\s+/g,'-');if(!n)return toast('ใส่ชื่อห้อง','err');
+  const r=await sb.from('channels').insert({server_id:srv.id,name:n,kind:'pay'});if(r.error)return toast(r.error.message,'err');toast('สร้างห้องแล้ว','ok');await pickSrv(srv.id);srvAdmin()};

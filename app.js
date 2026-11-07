@@ -78,10 +78,10 @@ async function loadMembers(){const {data}=await sb.from('members').select('user_
 function renderMembers(){renderMemberList()}
 window.pickCh=async id=>{
   ch=chs.find(c=>c.id==id);if(!ch)return;lastCh[srv.id]=id;closeNav();renderChans();$('#chName').innerHTML=`${icon(ch)} ${esc(ch.name)}`;
-  evTop();const v=ch.kind=='voice';$('#vcBtn').classList.toggle('hide',!v);$('#vcBtn').textContent=(vch&&vchId==ch.id)?'📴 ออกจากห้อง':'🎤 เข้าห้องเสียง';$('#send').classList.toggle('hide',v||!canPost());
+  evTop();const v=ch.kind=='voice';$('#vcBtn').classList.toggle('hide',!v);$('#vcBtn').textContent=(vch&&vchId==ch.id)?'📴 ออกจากห้อง':'🎤 เข้าห้องเสียง';$('#send').classList.toggle('hide',!canPost());
   if(sub){sb.removeChannel(sub);sub=null}MC={};
+  if(ch.kind=='pay'){$('#send').classList.add('hide');return renderPay()}
   if(ch.kind=='donate'){$('#send').classList.add('hide');return renderDonate()}
-  if(v){$('#msgs').innerHTML=`<div class="empty">🔊<h3>${esc(ch.name)}</h3><p>กด “เข้าห้องเสียง” — เข้าได้ไม่จำกัดจำนวนคน</p></div>`;return}
   $('#msgs').innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   const cur=ch.id,{data,error}=await sb.from('messages').select('*,reactions(*)').eq('channel_id',id).order('created_at',{ascending:false}).limit(80);
   if(ch?.id!=cur)return;if(error){$('#msgs').innerHTML='';return toast('โหลดข้อความไม่สำเร็จ: '+error.message,'err')}
@@ -117,7 +117,7 @@ $('#chatView').addEventListener('dragover',e=>e.preventDefault());$('#chatView')
 $('#txt').oninput=()=>{const m=/@([^\s@]*)$/.exec($('#txt').value),b=$('#mpop');if(!m)return b.classList.add('hide');const q=m[1].toLowerCase(),l=[{alias:'everyone'},...roles.map(r=>({alias:r.name})),...members].filter(u=>u.alias&&u.alias.toLowerCase().startsWith(q)).slice(0,6);if(!l.length)return b.classList.add('hide');b.innerHTML=l.map(u=>`<div data-a="${esc(u.alias)}">@${esc(u.alias)}</div>`).join('');b.classList.remove('hide')};
 $('#mpop').onclick=e=>{const a=e.target.dataset?.a;if(!a)return;const t=$('#txt');t.value=t.value.replace(/@([^\s@]*)$/,'@'+a+' ');$('#mpop').classList.add('hide');t.focus()};
 const spam=t=>/(.)\1{24,}/.test(t);
-$('#send').onsubmit=async e=>{e.preventDefault();if(!ch||ch.kind=='voice')return;const content=$('#txt').value.trim();if(!content&&!pend)return;if(spam(content))return toast('ข้อความคล้ายสแปม','err');
+$('#send').onsubmit=async e=>{e.preventDefault();if(!ch)return;const content=$('#txt').value.trim();if(!content&&!pend)return;if(spam(content))return toast('ข้อความคล้ายสแปม','err');
   const btn=$('.go');btn.disabled=true;
   try{const row={channel_id:ch.id,user_id:me.id,content,reply_to:replyTo};
    if(pend){let f=pend;if(f.type.startsWith('image/'))f=await shrink(f,2048);row.file_url=await upload(f);row.file_name=pend.name}
@@ -132,8 +132,8 @@ function renderStage(){
   if(!vchId){box.innerHTML='';box.classList.add('hide');return}
   box.classList.remove('hide');
   const ids=[me.id,...Object.keys(peers)];
-  box.innerHTML=`<div class="stage">${ids.map(id=>`<div class="tile" data-id="${id}"><div class="tv"></div><div class="tcenter">${avatar(P[id]||me,'xl')}</div><div class="tn">${dn(P[id]||me)}${id==me.id&&!micOn()?' 🔇':''}</div></div>`).join('')}</div>
-  <div class="vbar"><button class="vb ${micOn()?'':'off'}" title="ไมค์" onclick="vcMute()">${micOn()?'🎙':'🔇'}</button><button class="vb ${screen?'on':''}" title="แชร์หน้าจอ" onclick="vcScreen()">🖥</button><button class="vb" title="กิจกรรม" onclick="activitiesModal()">🎮</button><button class="vb end" title="ออกจากห้อง" onclick="leave()">📞</button></div><div id="vcMedia" class="hide"></div>`;
+  box.innerHTML=`<div class="stage">${ids.map(id=>`<div class="tile${spkOn[id]?' speaking':''}" data-id="${id}"><div class="tv"></div><div class="tcenter">${avatar(P[id]||me,'xl')}</div><div class="tn">${dn(P[id]||me)}${id==me.id&&!micOn()?' 🔇':''}</div></div>`).join('')}</div>
+  <div class="vbar"><button class="vb ${micOn()?'':'off'}" title="ไมค์" onclick="vcMute()">${micOn()?'🎙':'🔇'}</button><button class="vb ${screen?'on':''}" title="แชร์หน้าจอ" onclick="vcScreen()">🖥</button><button class="vb" title="กิจกรรม" onclick="activitiesModal()">🎮</button><button class="vb" title="แชทในห้องเสียง" onclick="vcChatToggle()">💬</button><button class="vb end" title="ออกจากห้อง" onclick="leave()">📞</button></div><div id="vcMedia" class="hide"></div>`;
   const media=box.querySelector('#vcMedia');
   ids.forEach(id=>{const tile=box.querySelector(`.tile[data-id="${id}"]`);if(!tile)return;const tv=tile.querySelector('.tv');
     const els=id==me.id?(selfV?[selfV]:[]):Object.values(peers[id].els);
@@ -141,7 +141,7 @@ function renderStage(){
 }
 async function joinVoice(){
   try{mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch{return toast('ต้องอนุญาตไมค์ และเปิดเว็บผ่าน https','err')}
-  vchId=ch.id;$('#vcBtn').textContent='📴 ออกจากห้อง';renderStage();
+  vchId=ch.id;if(mic)watchSpeak(me.id,mic.getAudioTracks()[0]);$('#vcBtn').textContent='📴 ออกจากห้อง';renderStage();
   vch=sb.channel('voice:'+vchId,{config:{presence:{key:me.id},broadcast:{self:false}}});
   vch.on('broadcast',{event:'sig'},({payload:p})=>{if(p.to==me.id)onSig(p)})
    .on('presence',{event:'join'},({key})=>{if(key!=me.id)pc(key)})
@@ -154,14 +154,14 @@ function pc(id){if(peers[id])return peers[id].p;
   user(id).then(()=>renderStage());renderStage();
   if(mic)mic.getTracks().forEach(t=>p.addTrack(t,mic));if(screen)screen.getTracks().forEach(t=>p.addTrack(t,screen));
   p.onicecandidate=e=>e.candidate&&sig(id,{c:e.candidate});
-  p.ontrack=e=>{const s=e.streams[0];if(!s)return;mediaEl(st,s);
+  p.ontrack=e=>{if(e.track.kind=='audio')watchSpeak(id,e.track);const s=e.streams[0];if(!s)return;mediaEl(st,s);
     s.onremovetrack=()=>{if(!s.getTracks().length){delete st.els[s.id]}renderStage()};renderStage()};
   p.onnegotiationneeded=async()=>{try{st.making=true;await p.setLocalDescription();sig(id,{d:p.localDescription})}catch(e){console.warn(e)}finally{st.making=false}};
   p.onconnectionstatechange=()=>{if(p.connectionState=='failed')p.restartIce()};return p}
 async function onSig(m){pc(m.from);const s=peers[m.from],p=s.p;
   try{if(m.d){const col=m.d.type=='offer'&&(s.making||p.signalingState!='stable');s.ignore=!s.polite&&col;if(s.ignore)return;await p.setRemoteDescription(m.d);if(m.d.type=='offer'){await p.setLocalDescription();sig(m.from,{d:p.localDescription})}}
    else if(m.c){try{await p.addIceCandidate(m.c)}catch(e){if(!s.ignore)throw e}}}catch(e){console.warn(e)}}
-function drop(id){const s=peers[id];if(!s)return;s.p.close();Object.values(s.els).forEach(v=>v.remove());delete peers[id];renderStage()}
+function drop(id){const s=peers[id];if(!s)return;delete spk[id];delete spkOn[id];s.p.close();Object.values(s.els).forEach(v=>v.remove());delete peers[id];renderStage()}
 function stopScreen(){if(!screen)return;const tr=screen.getTracks();tr.forEach(t=>t.stop());Object.values(peers).forEach(st=>st.p.getSenders().filter(s=>s.track&&tr.includes(s.track)).forEach(s=>st.p.removeTrack(s)));screen=null;selfV=null;renderStage()}
 window.vcScreen=async()=>{if(screen)return stopScreen();
   try{screen=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true})}catch{return toast('แชร์หน้าจอไม่ได้ (บางเบราว์เซอร์บนมือถือไม่รองรับ)','err')}
@@ -218,7 +218,7 @@ window.srvAdmin=()=>{if(!isMgr())return openModal(`<h3>${esc(srv.name)}</h3><but
   <h3>ยศในชุมชน</h3>${roles.map(r=>`<div class="row">${roleTag(r)}<span class="sp"></span><button class="g" onclick="roleEditor('${r.id}')">ตั้งค่า</button><button class="d" onclick="delRole('${r.id}')">ลบ</button></div>`).join('')||'<span class="mu">ยังไม่มียศ</span>'}
   <div class="row"><input id="rn" placeholder="ชื่อยศ"><input id="rc" type="color" value="#7c5cff"><button onclick="addRole()">สร้างยศ</button></div>
   <div class="row"><select id="ru">${mo}</select><select id="rr">${ro}</select><button onclick="giveRole(1)">มอบ</button><button class="g" onclick="giveRole(0)">ถอน</button></div>
-  ${catAdminHtml()}${iconAdminHtml()}${bannerAdminHtml()}${rewardAdminHtml()}${emoAdminHtml()}${wmAdminHtml()}${themeAdminHtml()}${evalAdminHtml()}${donateAdminHtml()}${codeAdminHtml()}
+  ${catAdminHtml()}${iconAdminHtml()}${bannerAdminHtml()}${rewardAdminHtml()}${emoAdminHtml()}${wmAdminHtml()}${themeAdminHtml()}${evalAdminHtml()}${donateAdminHtml()}${payAdminHtml()}${codeAdminHtml()}
   <h3>บอทของชุมชน</h3><p class="mu">โค้ดบอทรันในเบราว์เซอร์ของ CEO/เจ้าของชุมชนขณะเปิดเว็บ — ตั้งได้หลายระบบต่อหนึ่งบอท</p><div id="botsBox"></div><button onclick="botEditor()">＋ สร้างบอท</button>
   ${srv.owner==me.id||rank(me)==5?'<h3>โซนอันตราย</h3><button class="d" onclick="delSrv()">ลบชุมชนนี้ทั้งหมด</button>':'<button class="d" onclick="leaveSrv()">ออกจากชุมชน</button>'}`);loadBotsBox()};
 const reSrv=async()=>{const id=srv.id;await loadServers(id);srvAdmin()};
